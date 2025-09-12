@@ -205,6 +205,7 @@ window.addEventListener('resize', () => {
 
 function updateSceneScale() {
   const aspect = window.innerWidth / window.innerHeight;
+  scene.aspect =aspect;
   const scale = aspect < 1 ? 0.8 : 1;
   scene.scale.set(scale, scale, scale);
 }
