@@ -197,8 +197,9 @@ function toggleAnimation() {
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
-  camera.position.z = aspect < 1 ? -6 : -4;
+  //camera.position.z = aspect < 1 ? -6 : -4;
   camera.updateProjectionMatrix();
+  updateSceneScale();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
