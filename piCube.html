@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <title>Проволочный кубик 5x5x5 с туманом и числами</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #111; }
+
+    .buttons {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .buttons button {
+      background: #222;
+      color: #0ff;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    .buttons button:hover {
+      background: #0ff;
+      color: #000;
+    }
+
+    .buttons button.active {
+      background: #0ff;
+      color: #000;
+      border-color: #0ff;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+<div class="buttons">
+  <button onclick="highlightPlane('z', 0, this)">-1-</button>
+  <button onclick="highlightPlane('z', 1, this)">-2-</button>
+  <button onclick="highlightPlane('z', 2, this)">-3-</button>
+  <button onclick="highlightPlane('z', 3, this)">-4-</button>
+  <button onclick="highlightPlane('z', 4, this)">-5-</button>
+  <button onclick="highlightPlane(null, null, this)">---</button>
+  <button onclick="toggleAnimation()">▶ Пауза / Пуск</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script>
+const labels = [];
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0x111111, 2, 12);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+const gridSize = 5;
+const spacing = 0.5;
+
+const piDigits =
+  "14159265358979323846264338327950288419716939937510" +
+  "58209749445923078164062862089986280348253421170679" +
+  "82148086513282306647093844609550582231725359408128" +
+  "48111745028410270193852110555964462294895493038196" +
+  "44288109756659334461284756482337867831652712019091";
+const piPairs = piDigits.match(/../g);
+
+function createNumberPlane(text, color = 'cyan', size = 0.2) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const dim = 128;
+  canvas.width = canvas.height = dim;
+
+  ctx.clearRect(0, 0, dim, dim);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 80px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, dim / 2, dim / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+    side: THREE.DoubleSide,
+    opacity: 1
+  });
+  const geometry = new THREE.PlaneGeometry(size, size);
+  return new THREE.Mesh(geometry, material);
+}
+
+let piIndex = 0;
+for (let z = 0; z < gridSize; z++) {
+  for (let y = 0; y < gridSize; y++) {
+    for (let x = 0; x < gridSize; x++) {
+      const px = -(x - 2) * spacing;
+      const py = -(y - 2) * spacing;
+      const pz = (z - 2) * spacing;
+
+      const text = piPairs[piIndex++] || "??";
+      const label = createNumberPlane(text);
+      label.position.set(px, py, pz);
+      label.lookAt(px, py, pz - 1);
+
+      scene.add(label);
+      labels.push({
+        mesh: label,
+        pos: { x, y, z },
+        targetScale: 1,
+        currentScale: 1,
+        targetOpacity: 1,
+        currentOpacity: 1
+      });
+    }
+  }
+}
+
+function updateScalesAndColors() {
+  labels.forEach(label => {
+    label.currentScale = THREE.MathUtils.lerp(label.currentScale, label.targetScale, 0.25);
+    label.mesh.scale.set(label.currentScale, label.currentScale, 1);
+
+    label.currentOpacity = THREE.MathUtils.lerp(label.currentOpacity, label.targetOpacity, 0.25);
+    label.mesh.material.opacity = label.currentOpacity;
+  });
+}
+
+function highlightPlane(axis, value, button) {
+  labels.forEach(label => {
+    const match = axis !== null && label.pos[axis] === value;
+    label.targetScale = match ? 2.5 : 1;
+    label.targetOpacity = axis === null ? 1 : (match ? 1 : 0.2);
+  });
+
+  // снять выделение у всех кнопок
+  document.querySelectorAll('.buttons button').forEach(btn => btn.classList.remove('active'));
+  // подсветить текущую кнопку
+  if (button) button.classList.add('active');
+}
+
+let angle = 0;
+let animateCamera = true;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  if (animateCamera) {
+    angle += 0.02;
+    const radius = 0.25;
+    camera.position.set(
+      -1.5 + radius * Math.cos(angle),
+      2 + radius * Math.sin(angle),
+      -4
+    );
+    camera.lookAt(0, 0, 0);
+  }
+
+  updateScalesAndColors();
+  renderer.render(scene, camera);
+}
+animate();
+
+function toggleAnimation() {
+  animateCamera = !animateCamera;
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
