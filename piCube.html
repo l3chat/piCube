@@ -4,58 +4,60 @@
   <meta charset="UTF-8" />
   <title>π³</title>
   <style>
-    body { margin: 0; overflow: hidden; background: #111; }
+    body {
+  margin: 0;
+  overflow: hidden;
+  background: #111;
+}
 
-    .buttons {
-      position: absolute;
-      bottom: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      width: 95%;
-      gap: 8px;
-    }
+/* Общие настройки кнопок */
+.buttons {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  gap: 8px;
+}
 
-    .buttons button {
-      flex: 1 1 30%;
-      min-width: 70px;
-      padding: 12px 0;
-      font-size: 18px;
-      border: 1px solid #555;
-      border-radius: 6px;
-      background: #222;
-      color: #0ff;
-      cursor: pointer;
-      transition: background 0.3s, color 0.3s;
-    }
+.buttons button {
+  background: #222;
+  color: #0ff;
+  border: 1px solid #555;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 16px;
+  cursor: pointer;
+  flex: 1;
+}
 
-    .buttons button:hover {
-      background: #0ff;
-      color: #000;
-    }
+.buttons button:hover,
+.buttons button.active {
+  background: #0ff;
+  color: #000;
+}
 
-    .buttons button.active {
-      background: #0ff;
-      color: #000;
-      border-color: #0ff;
-      font-weight: bold;
-    }
+/* Портретная ориентация: кнопки сверху */
+@media (orientation: portrait) {
+  .buttons {
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 95%;
+    flex-direction: row;
+  }
+}
 
-    @media (max-width: 600px) {
-      .buttons {
-        flex-direction: column;
-        align-items: stretch;
-      }
-      .buttons button {
-        flex: none;
-        width: 100%;
-        font-size: 20px;
-        padding: 14px;
-      }
-    }
+/* Альбомная ориентация: кнопки сбоку */
+@media (orientation: landscape) {
+  .buttons {
+    top: 50%;
+    left: 10px;
+    transform: translateY(-50%);
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
   </style>
 </head>
 <body>
