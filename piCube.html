@@ -166,12 +166,12 @@ const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
 function animate() {
   requestAnimationFrame(animate);
 
-  if (autoRotate) {
+/*  if (autoRotate) {
     const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.03);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
-  }
+  }*/
 
   updateScalesAndColors();
   renderer.render(scene, camera);
