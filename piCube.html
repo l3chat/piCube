@@ -47,7 +47,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.min.js"></script>
 <script>
 const labels = [];
 const scene = new THREE.Scene();
@@ -59,13 +58,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1));
-
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;   // плавность
-controls.dampingFactor = 0.05;
-controls.enablePan = false;      // запретить сдвиг (если хочешь только вращение и зум)
-controls.minDistance = 2;        // минимальная дистанция
-controls.maxDistance = 10;       // максимальная дистанция
 
 // параметры куба
 const gridSize = 5;
@@ -173,20 +165,13 @@ const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
 // === Анимация ===
 function animate() {
   requestAnimationFrame(animate);
-  updateScalesAndColors();
-  renderer.render(scene, camera);
-}
-function animate() {
-  requestAnimationFrame(animate);
 
-  controls.update();
-
-/*  if (autoRotate) {
+  if (autoRotate) {
     const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.03);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
-  }*/
+  }
 
   updateScalesAndColors();
   renderer.render(scene, camera);
