@@ -139,10 +139,6 @@ function updateScalesAndColors() {
   });
 }
 
-
-
-
-
 // === Камера и вращение ===
 let autoRotate = true;
 let radius = 4.5;
@@ -151,23 +147,52 @@ let radius = 4.5;
 camera.position.set(-1.5, 2, -radius);
 camera.lookAt(0, 0, 0);
 
-// === Построение оси вращения ===
-const distance = camera.position.length();
-const camDir = camera.position.clone().normalize();
+// ось вращения
+let tiltAxis = new THREE.Vector3(0, 1, 0);
 
-let up = new THREE.Vector3(0, 1, 0);
-if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
+// === Управление мышкой ===
+let isDragging = false;
+let lastX = 0, lastY = 0;
 
-let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
-const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
-const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
+window.addEventListener('mousedown', e => {
+  isDragging = true;
+  lastX = e.clientX;
+  lastY = e.clientY;
+  autoRotate = false; // при ручном управлении отключаем авто
+});
+
+window.addEventListener('mouseup', () => {
+  isDragging = false;
+});
+
+window.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+
+  const dx = e.clientX - lastX;
+  const dy = e.clientY - lastY;
+  lastX = e.clientX;
+  lastY = e.clientY;
+
+  // вращаем tiltAxis
+  const qx = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), dx * 0.005);
+  const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), dy * 0.005);
+  const q = new THREE.Quaternion().multiplyQuaternions(qx, qy);
+
+  tiltAxis.applyQuaternion(q).normalize();
+});
+
+// колесо мыши — масштаб (радиус)
+window.addEventListener('wheel', e => {
+  radius += e.deltaY * 0.01;
+  radius = Math.max(1.5, Math.min(10, radius));
+});
 
 // === Анимация ===
 function animate() {
   requestAnimationFrame(animate);
 
   if (autoRotate) {
-    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.03);
+    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.01);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
@@ -177,11 +202,6 @@ function animate() {
   renderer.render(scene, camera);
 }
 animate();
-
-
-
-
-
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
