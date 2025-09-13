@@ -47,7 +47,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
 <script>
 const labels = [];
 const scene = new THREE.Scene();
@@ -59,14 +58,6 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1));
-
-// OrbitControls
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.enablePan = false;
-controls.minDistance = 2;
-controls.maxDistance = 10;
 
 // параметры куба
 const gridSize = 5;
@@ -81,26 +72,21 @@ const piDigits =
   "44288109756659334461284756482337867831652712019091";
 const piPairs = piDigits.match(/../g);
 
-function createNumberPlane(text, size = 0.2) {
+function createNumberPlane(text, color = 'cyan', size = 0.2) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   const dim = 128;
   canvas.width = canvas.height = dim;
 
   ctx.clearRect(0, 0, dim, dim);
-  ctx.fillStyle = 'white';
+  ctx.fillStyle = color;
   ctx.font = 'bold 80px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, dim / 2, dim / 2);
 
   const texture = new THREE.CanvasTexture(canvas);
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-    side: THREE.DoubleSide,
-    color: 0x00ffff
-  });
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
   const geometry = new THREE.PlaneGeometry(size, size);
   return new THREE.Mesh(geometry, material);
 }
@@ -121,13 +107,15 @@ for (let z = 0; z < gridSize; z++) {
       labels.push({
         mesh: label,
         pos: { x, y, z },
-        targetScale: 1
+        targetScale: 1,
+        defaultColor: 'cyan',
+        text: piPairs[piIndex - 1]
       });
     }
   }
 }
 
-// масштаб и цвет
+// анимация масштаба и яркости
 function updateScalesAndColors() {
   labels.forEach(label => {
     const current = label.mesh.scale.x;
@@ -136,11 +124,24 @@ function updateScalesAndColors() {
     label.mesh.scale.set(newScale, newScale, 1);
 
     const isBright = target > 1.5;
-    const desiredColor = isBright ? 0xffffff : target < 1 ? 0x044444 : 0x00ffff;
+    const desiredColor = isBright ? 'white' : label.targetScale < 1 ? '#044' : label.defaultColor;
 
-    label.mesh.material.color.set(desiredColor);
+    if (label.currentColor !== desiredColor) {
+      const newLabel = createNumberPlane(label.text, desiredColor, 0.2);
+      newLabel.position.copy(label.mesh.position);
+      newLabel.scale.copy(label.mesh.scale);
+      newLabel.lookAt(label.mesh.position.x, label.mesh.position.y, label.mesh.position.z - 1);
+      scene.remove(label.mesh);
+      scene.add(newLabel);
+      label.mesh = newLabel;
+      label.currentColor = desiredColor;
+    }
   });
 }
+
+
+
+
 
 // === Камера и вращение ===
 let autoRotate = true;
@@ -149,33 +150,38 @@ let radius = 4.5;
 // начальная позиция камеры
 camera.position.set(-1.5, 2, -radius);
 camera.lookAt(0, 0, 0);
-controls.update();
 
-// ось вращения
+// === Построение оси вращения ===
+const distance = camera.position.length();
 const camDir = camera.position.clone().normalize();
+
 let up = new THREE.Vector3(0, 1, 0);
 if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
+
 let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
 const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
 const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
 
-// анимация
+// === Анимация ===
 function animate() {
   requestAnimationFrame(animate);
 
   if (autoRotate) {
-    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.01);
+    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.03);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
-  } else {
-    controls.update();
   }
 
   updateScalesAndColors();
   renderer.render(scene, camera);
 }
 animate();
+
+
+
+
+
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
