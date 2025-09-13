@@ -148,7 +148,7 @@ let autoRotate = true;
 let radius = 4.5;
 
 // начальная позиция камеры
-camera.position.set(1.5, 2, -radius);
+camera.position.set(-1.5, 2, -radius);
 camera.lookAt(0, 0, 0);
 
 // === Построение оси вращения ===
@@ -171,7 +171,7 @@ function animate() {
   requestAnimationFrame(animate);
 
   if (autoRotate) {
-    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.1);
+    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.02);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
