@@ -141,37 +141,50 @@ function updateScalesAndColors() {
 
 
 
-
 // === Камера и вращение ===
 let autoRotate = true;
 let radius = 4.5;
-let theta = 0;          // горизонтальный угол
-let phi = Math.PI/4;    // вертикальный угол (наклон)
 
-updateCamera();
+// начальная позиция камеры
+camera.position.set(0, 0, radius);
+camera.lookAt(0, 0, 0);
 
-// вспомогательная функция
-function updateCamera() {
-  const x = radius * Math.cos(phi) * Math.cos(theta);
-  const y = radius * Math.sin(phi);
-  const z = radius * Math.cos(phi) * Math.sin(theta);
-  camera.position.set(x, y, z);
-  camera.lookAt(0, 0, 0);
-}
+// === Ось вращения (фиксируем один раз) ===
+// Берём направление камеры (из центра к камере)
+const dir = camera.position.clone().normalize();
+
+// Чтобы задать наклонённую ось, берём комбинацию dir и вектора "вбок"
+const up = new THREE.Vector3(0, 1, 0);
+if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0); // если совпадает, берём X
+const side = new THREE.Vector3().crossVectors(dir, up).normalize();
+
+// теперь фиксируем tiltAxis
+const tiltAxis = new THREE.Vector3()
+  .addVectors(
+    dir.clone().multiplyScalar(0.2),   // чуть вдоль взгляда
+    side.clone().multiplyScalar(0.8)   // больше вбок
+  )
+  .normalize();
 
 // === Анимация ===
 function animate() {
   requestAnimationFrame(animate);
 
   if (autoRotate) {
-    theta += 0.003;  // скорость автоанимации
-    updateCamera();
+    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.01);
+    camera.position.applyQuaternion(q);
+    camera.position.setLength(radius);
+    camera.lookAt(0, 0, 0);
   }
 
   updateScalesAndColors();
   renderer.render(scene, camera);
 }
 animate();
+
+
+
+
 
 
 window.addEventListener('resize', () => {
