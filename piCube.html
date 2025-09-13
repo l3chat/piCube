@@ -47,6 +47,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
 <script>
 const labels = [];
 const scene = new THREE.Scene();
@@ -108,6 +109,7 @@ for (let z = 0; z < gridSize; z++) {
         mesh: label,
         pos: { x, y, z },
         targetScale: 1,
+        currentColor: 'cyan',
         defaultColor: 'cyan',
         text: piPairs[piIndex - 1]
       });
@@ -115,7 +117,7 @@ for (let z = 0; z < gridSize; z++) {
   }
 }
 
-// анимация масштаба и яркости
+// обновление масштаба и цвета
 function updateScalesAndColors() {
   labels.forEach(label => {
     const current = label.mesh.scale.x;
@@ -127,68 +129,73 @@ function updateScalesAndColors() {
     const desiredColor = isBright ? 'white' : label.targetScale < 1 ? '#044' : label.defaultColor;
 
     if (label.currentColor !== desiredColor) {
+      // просто меняем материал, а не пересоздаём Mesh
       const newLabel = createNumberPlane(label.text, desiredColor, 0.2);
-      newLabel.position.copy(label.mesh.position);
-      newLabel.scale.copy(label.mesh.scale);
-      newLabel.lookAt(label.mesh.position.x, label.mesh.position.y, label.mesh.position.z - 1);
-      scene.remove(label.mesh);
-      scene.add(newLabel);
-      label.mesh = newLabel;
+      label.mesh.material = newLabel.material;
       label.currentColor = desiredColor;
     }
   });
 }
 
-
-
-
-
-// === Камера и вращение ===
-let autoRotate = true;
+// === Камера и управление ===
 let radius = 4.5;
-
-// начальная позиция камеры
 camera.position.set(-1.5, 2, -radius);
 camera.lookAt(0, 0, 0);
 
-// === Построение оси вращения ===
-const distance = camera.position.length();
-const camDir = camera.position.clone().normalize();
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.minDistance = 2;
+controls.maxDistance = 10;
+controls.enablePan = false;
 
-let up = new THREE.Vector3(0, 1, 0);
-if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
+let autoRotate = true;
+let tiltAxis;
 
-let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
-const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
-const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
+// функция пересчёта оси
+function recalcTiltAxis() {
+  const camDir = camera.position.clone().normalize();
+  let up = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
+  let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
+  const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
+  tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
+}
+recalcTiltAxis();
+
+// отключаем авто при ручном управлении
+controls.addEventListener('start', () => {
+  autoRotate = false;
+});
+controls.addEventListener('end', () => {
+  recalcTiltAxis();
+});
 
 // === Анимация ===
 function animate() {
   requestAnimationFrame(animate);
 
-  if (autoRotate) {
-    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.03);
+  if (autoRotate && tiltAxis) {
+    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.01);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
   }
 
+  controls.update();
   updateScalesAndColors();
   renderer.render(scene, camera);
 }
 animate();
 
-
-
-
-
-
+// === Resize ===
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+// === Подсветка плоскости ===
 function highlightPlane(axis, value, button) {
   document.querySelectorAll('.buttons button').forEach(btn => btn.classList.remove('active'));
   if (button) button.classList.add('active');
