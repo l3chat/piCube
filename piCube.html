@@ -78,12 +78,12 @@
     const scene = new THREE.Scene();
     scene.fog = new THREE.Fog(0x111111, 2, 12);
 
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(0.8*window.innerWidth, 0.8*window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1));
+scene.add(new THREE.AmbientLight(0xffffff, 1));
 
     const gridSize = 5;
     const spacing = 0.5;
@@ -159,7 +159,7 @@ renderer.setSize(0.8*window.innerWidth, 0.8*window.innerHeight);
 function highlightPlane(axis, value, button) {
   labels.forEach(label => {
     const match = axis !== null && label.pos[axis] === value;
-    label.targetScale = match ? 2.5 : 1;
+    label.targetScale = match ? 1.5 : 1;
     label.targetOpacity = axis === null ? 1 : (match ? 1 : 0.2);
   });
 
@@ -195,11 +195,21 @@ function toggleAnimation() {
   animateCamera = !animateCamera;
 }
 
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  </script>
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  //camera.position.z = aspect < 1 ? -6 : -4;
+  camera.updateProjectionMatrix();
+  updateSceneScale();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function updateSceneScale() {
+  const aspect = window.innerWidth / window.innerHeight;
+  scene.aspect =aspect;
+  const scale = aspect < 1 ? 0.7 : 1;
+  scene.scale.set(scale, scale, scale);
+}
+
+</script>
 </body>
 </html>
