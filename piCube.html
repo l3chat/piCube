@@ -43,10 +43,10 @@
   <button onclick="highlightPlane('z', 3, this)">-4-</button>
   <button onclick="highlightPlane('z', 4, this)">-5-</button>
   <button onclick="highlightPlane(null, null, this)">---</button>
+  <button onclick="toggleAutoRotate(this)">⟳</button>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
 <script>
 const labels = [];
 const scene = new THREE.Scene();
@@ -139,71 +139,56 @@ function updateScalesAndColors() {
   });
 }
 
-// === Камера и управление ===
+
+
+
+
+// === Камера и вращение ===
+let autoRotate = true;
 let radius = 4.5;
+
+// начальная позиция камеры
 camera.position.set(-1.5, 2, -radius);
 camera.lookAt(0, 0, 0);
 
-const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.minDistance = 2;
-controls.maxDistance = 10;
-controls.enablePan = false;
+// === Построение оси вращения ===
+const distance = camera.position.length();
+const camDir = camera.position.clone().normalize();
 
-let autoRotate = true;
-let tiltAxis;
+let up = new THREE.Vector3(0, 1, 0);
+if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
 
-// функция пересчёта оси
-function recalcTiltAxis() {
-  const camDir = camera.position.clone().normalize();
-  let up = new THREE.Vector3(0, 1, 0);
-  if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
-  let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
-  const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
-  tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
-}
-recalcTiltAxis();
-
-// отключаем авто при ручном управлении, включаем через 5с
-let autoRotateTimeout;
-controls.addEventListener('start', () => {
-  autoRotate = false;
-  clearTimeout(autoRotateTimeout);
-});
-controls.addEventListener('end', () => {
-  clearTimeout(autoRotateTimeout);
-  autoRotateTimeout = setTimeout(() => {
-    recalcTiltAxis();
-    autoRotate = true;
-  }, 5000);
-});
+let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
+const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
+const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
 
 // === Анимация ===
 function animate() {
   requestAnimationFrame(animate);
 
-  if (autoRotate && tiltAxis) {
-    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.01);
+  if (autoRotate) {
+    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.03);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
   }
 
-  controls.update();
   updateScalesAndColors();
   renderer.render(scene, camera);
 }
 animate();
 
-// === Resize ===
+
+
+
+
+
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// === Подсветка плоскости ===
 function highlightPlane(axis, value, button) {
   document.querySelectorAll('.buttons button').forEach(btn => btn.classList.remove('active'));
   if (button) button.classList.add('active');
@@ -216,6 +201,11 @@ function highlightPlane(axis, value, button) {
       label.targetScale = match ? 2.5 : 0.5;
     }
   });
+}
+
+function toggleAutoRotate(button) {
+  autoRotate = !autoRotate;
+  button.classList.toggle('active', autoRotate);
 }
 </script>
 </body>
