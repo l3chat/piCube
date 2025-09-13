@@ -5,34 +5,34 @@
   <title>π³</title>
   <style>
     body {
-  margin: 0;
-  overflow: hidden;
-  background: #111;
-}
+      margin: 0;
+      overflow: hidden;
+      background: #111;
+    }
 
 /* Общие настройки кнопок */
-.buttons {
-  position: absolute;
-  z-index: 1;
-  display: flex;
+    .buttons {
+      position: absolute;
+      z-index: 1;
+      display: flex;
   gap: 8px;
-}
+    }
 
-.buttons button {
-  background: #222;
-  color: #0ff;
-  border: 1px solid #555;
-  border-radius: 4px;
+    .buttons button {
+      background: #222;
+      color: #0ff;
+      border: 1px solid #555;
+      border-radius: 4px;
   padding: 10px 16px;
-  font-size: 16px;
-  cursor: pointer;
+      font-size: 16px;
+      cursor: pointer;
   flex: 1;
-}
+    }
 
 .buttons button:hover,
-.buttons button.active {
-  background: #0ff;
-  color: #000;
+    .buttons button.active {
+      background: #0ff;
+      color: #000;
 }
 
 /* Портретная ориентация: кнопки сверху */
@@ -57,26 +57,26 @@
     flex-direction: column;
     align-items: flex-start;
   }
-}
+    }
   </style>
 </head>
 <body>
-<div class="buttons">
-  <button onclick="highlightPlane('z', 0, this)">-1-</button>
-  <button onclick="highlightPlane('z', 1, this)">-2-</button>
-  <button onclick="highlightPlane('z', 2, this)">-3-</button>
-  <button onclick="highlightPlane('z', 3, this)">-4-</button>
-  <button onclick="highlightPlane('z', 4, this)">-5-</button>
-  <button onclick="highlightPlane(null, null, this)">---</button>
+  <div class="buttons">
+    <button onclick="highlightPlane('z', 0, this)">-1-</button>
+    <button onclick="highlightPlane('z', 1, this)">-2-</button>
+    <button onclick="highlightPlane('z', 2, this)">-3-</button>
+    <button onclick="highlightPlane('z', 3, this)">-4-</button>
+    <button onclick="highlightPlane('z', 4, this)">-5-</button>
+    <button onclick="highlightPlane(null, null, this)">---</button>
   <button onclick="toggleAnimation()">▶ Пауза / Пуск</button>
-</div>
+  </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-<script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script>
 
-const labels = [];
-const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0x111111, 2, 12);
+    const labels = [];
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x111111, 2, 12);
 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -85,69 +85,69 @@ document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1));
 
-const gridSize = 5;
-const spacing = 0.5;
+    const gridSize = 5;
+    const spacing = 0.5;
 
-const piDigits =
-  "14159265358979323846264338327950288419716939937510" +
-  "58209749445923078164062862089986280348253421170679" +
-  "82148086513282306647093844609550582231725359408128" +
-  "48111745028410270193852110555964462294895493038196" +
-  "44288109756659334461284756482337867831652712019091";
-const piPairs = piDigits.match(/../g);
+    const piDigits =
+      "14159265358979323846264338327950288419716939937510" +
+      "58209749445923078164062862089986280348253421170679" +
+      "82148086513282306647093844609550582231725359408128" +
+      "48111745028410270193852110555964462294895493038196" +
+      "44288109756659334461284756482337867831652712019091";
+    const piPairs = piDigits.match(/../g);
 
-function createNumberPlane(text, color = 'cyan', size = 0.2) {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  const dim = 128;
-  canvas.width = canvas.height = dim;
+    function createNumberPlane(text, color = 'cyan', size = 0.2) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const dim = 128;
+      canvas.width = canvas.height = dim;
 
-  ctx.clearRect(0, 0, dim, dim);
-  ctx.fillStyle = color;
-  ctx.font = 'bold 80px sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, dim / 2, dim / 2);
+      ctx.clearRect(0, 0, dim, dim);
+      ctx.fillStyle = color;
+      ctx.font = 'bold 80px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, dim / 2, dim / 2);
 
-  const texture = new THREE.CanvasTexture(canvas);
+      const texture = new THREE.CanvasTexture(canvas);
   const material = new THREE.MeshBasicMaterial({
     map: texture,
     transparent: true,
     side: THREE.DoubleSide,
     opacity: 1
   });
-  const geometry = new THREE.PlaneGeometry(size, size);
-  return new THREE.Mesh(geometry, material);
-}
+      const geometry = new THREE.PlaneGeometry(size, size);
+      return new THREE.Mesh(geometry, material);
+    }
 
-let piIndex = 0;
-for (let z = 0; z < gridSize; z++) {
-  for (let y = 0; y < gridSize; y++) {
-    for (let x = 0; x < gridSize; x++) {
-      const px = -(x - 2) * spacing;
-      const py = -(y - 2) * spacing;
-      const pz = (z - 2) * spacing;
+    let piIndex = 0;
+    for (let z = 0; z < gridSize; z++) {
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          const px = -(x - 2) * spacing;
+          const py = -(y - 2) * spacing;
+          const pz = (z - 2) * spacing;
 
       const text = piPairs[piIndex++] || "??";
       const label = createNumberPlane(text);
-      label.position.set(px, py, pz);
-      label.lookAt(px, py, pz - 1);
+          label.position.set(px, py, pz);
+          label.lookAt(px, py, pz - 1);
 
-      scene.add(label);
-      labels.push({
-        mesh: label,
-        pos: { x, y, z },
-        targetScale: 1,
+          scene.add(label);
+          labels.push({
+            mesh: label,
+            pos: { x, y, z },
+            targetScale: 1,
         currentScale: 1,
         targetOpacity: 1,
         currentOpacity: 1
-      });
+          });
+        }
+      }
     }
-  }
-}
 
-function updateScalesAndColors() {
-  labels.forEach(label => {
+    function updateScalesAndColors() {
+      labels.forEach(label => {
     label.currentScale = THREE.MathUtils.lerp(label.currentScale, label.targetScale, 0.25);
     label.mesh.scale.set(label.currentScale, label.currentScale, 1);
 
@@ -169,11 +169,11 @@ function highlightPlane(axis, value, button) {
   if (button) button.classList.add('active');
 }
 
-let angle = 0;
+    let angle = 0;
 let animateCamera = true;
 
-function animate() {
-  requestAnimationFrame(animate);
+    function animate() {
+      requestAnimationFrame(animate);
 
   if (animateCamera) {
     angle += 0.02;
@@ -183,13 +183,13 @@ function animate() {
       2 + radius * Math.sin(angle),
       -4
     );
-    camera.lookAt(0, 0, 0);
-  }
+        camera.lookAt(0, 0, 0);
+      }
 
-  updateScalesAndColors();
-  renderer.render(scene, camera);
-}
-animate();
+      updateScalesAndColors();
+      renderer.render(scene, camera);
+    }
+    animate();
 
 function toggleAnimation() {
   animateCamera = !animateCamera;
