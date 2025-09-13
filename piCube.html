@@ -139,37 +139,38 @@ function updateScalesAndColors() {
   });
 }
 
-// автоматическое вращение камеры
-let autoRotate = true;
-let angle = 0;
-const radius = 4.5;
 
+
+
+// === Камера и вращение ===
+let autoRotate = true;
+let radius = 4.5;
+let theta = 0;          // горизонтальный угол
+let phi = Math.PI/4;    // вертикальный угол (наклон)
+
+// вспомогательная функция
+function updateCamera() {
+  const x = radius * Math.cos(phi) * Math.cos(theta);
+  const y = radius * Math.sin(phi);
+  const z = radius * Math.cos(phi) * Math.sin(theta);
+  camera.position.set(x, y, z);
+  camera.lookAt(0, 0, 0);
+}
+
+// === Анимация ===
 function animate() {
   requestAnimationFrame(animate);
 
   if (autoRotate) {
-    angle += 0.001;
-
-    // направление взгляда (центр - камера)
-    const dir = new THREE.Vector3().subVectors(new THREE.Vector3(0,0,0), camera.position).normalize();
-    const up = new THREE.Vector3(0,1,0);
-    if (Math.abs(dir.dot(up)) > 0.99) up.set(1,0,0);
-
-    // ось в плоскости, перпендикулярной dir
-    const axis = new THREE.Vector3().crossVectors(dir, up).normalize();
-    const offset = new THREE.Vector3().crossVectors(axis, dir).normalize().multiplyScalar(radius);
-
-    const q = new THREE.Quaternion().setFromAxisAngle(dir, angle);
-    offset.applyQuaternion(q);
-
-    camera.position.copy(offset);
-    camera.lookAt(0, 0, 0);
+    theta += 0.003;  // скорость автоанимации
+    updateCamera();
   }
 
   updateScalesAndColors();
   renderer.render(scene, camera);
 }
 animate();
+
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
