@@ -34,6 +34,14 @@
       font-weight: bold;
     }
   </style>
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+  }
+}
+  </script>
 </head>
 <body>
 <div class="buttons">
@@ -46,8 +54,8 @@
 </div>
 
 <script type="module">
-//  import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js";
-//  import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js";
+  import * as THREE from 'three'; //"https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js";
+//  import { OrbitControls } from 'three/addons/controls/OrbitControls'; //"https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js";
 
   const labels = [];
   const scene = new THREE.Scene();
