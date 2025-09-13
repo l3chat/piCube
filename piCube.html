@@ -160,10 +160,6 @@ if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
 
 let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
 const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
-
-//perp.multiplyScalar(distance * 0.1);
-//const tiltAxis = camera.position.clone().sub(perp).normalize();
-
 const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
 
 // === Анимация ===
@@ -171,7 +167,7 @@ function animate() {
   requestAnimationFrame(animate);
 
   if (autoRotate) {
-    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.02);
+    const q = new THREE.Quaternion().setFromAxisAngle(tiltAxis, 0.03);
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
