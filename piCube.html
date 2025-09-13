@@ -148,6 +148,8 @@ let radius = 4.5;
 let theta = 0;          // горизонтальный угол
 let phi = Math.PI/4;    // вертикальный угол (наклон)
 
+updateCamera();
+
 // вспомогательная функция
 function updateCamera() {
   const x = radius * Math.cos(phi) * Math.cos(theta);
