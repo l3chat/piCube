@@ -159,9 +159,12 @@ let up = new THREE.Vector3(0, 1, 0);
 if (Math.abs(camDir.dot(up)) > 0.99) up.set(1, 0, 0);
 
 let perp = new THREE.Vector3().crossVectors(camDir, up).normalize();
-perp.multiplyScalar(distance * 0.1);
+const qperp = new THREE.Quaternion().setFromAxisAngle(perp, 0.01);
 
-const tiltAxis = camera.position.clone().sub(perp).normalize();
+//perp.multiplyScalar(distance * 0.1);
+//const tiltAxis = camera.position.clone().sub(perp).normalize();
+
+const tiltAxis = camera.position.clone().applyQuaternion(qperp).normalize();
 
 // === Анимация ===
 function animate() {
