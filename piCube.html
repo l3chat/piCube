@@ -47,6 +47,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/controls/OrbitControls.js"></script>
 <script>
 const labels = [];
 const scene = new THREE.Scene();
@@ -58,6 +59,14 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
 scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+// OrbitControls
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enablePan = false;
+controls.minDistance = 2;
+controls.maxDistance = 10;
 
 // параметры куба
 const gridSize = 5;
@@ -79,7 +88,7 @@ function createNumberPlane(text, size = 0.2) {
   canvas.width = canvas.height = dim;
 
   ctx.clearRect(0, 0, dim, dim);
-  ctx.fillStyle = 'white'; // текст всегда белый
+  ctx.fillStyle = 'white';
   ctx.font = 'bold 80px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -90,7 +99,7 @@ function createNumberPlane(text, size = 0.2) {
     map: texture,
     transparent: true,
     side: THREE.DoubleSide,
-    color: 0x00ffff // стартовый цвет
+    color: 0x00ffff
   });
   const geometry = new THREE.PlaneGeometry(size, size);
   return new THREE.Mesh(geometry, material);
@@ -118,7 +127,7 @@ for (let z = 0; z < gridSize; z++) {
   }
 }
 
-// плавное изменение масштаба и цвета
+// масштаб и цвет
 function updateScalesAndColors() {
   labels.forEach(label => {
     const current = label.mesh.scale.x;
@@ -140,6 +149,7 @@ let radius = 4.5;
 // начальная позиция камеры
 camera.position.set(-1.5, 2, -radius);
 camera.lookAt(0, 0, 0);
+controls.update();
 
 // ось вращения
 const camDir = camera.position.clone().normalize();
@@ -158,6 +168,8 @@ function animate() {
     camera.position.applyQuaternion(q);
     camera.position.setLength(radius);
     camera.lookAt(0, 0, 0);
+  } else {
+    controls.update();
   }
 
   updateScalesAndColors();
