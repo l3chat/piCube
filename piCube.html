@@ -124,7 +124,7 @@
   }
 
   // анимация масштаба и яркости
-  function updateScalesAndColors() {
+  function updateScalesAndColorsOLD() {
     labels.forEach(label => {
       const current = label.mesh.scale.x;
       const target = label.targetScale;
@@ -146,6 +146,43 @@
       }
     });
   }
+
+  function updateScalesAndColors() {
+  labels.forEach(label => {
+    // Масштаб
+    const current = label.mesh.scale.x;
+    const target = label.targetScale;
+    const newScale = THREE.MathUtils.lerp(current, target, 0.15);
+    label.mesh.scale.set(newScale, newScale, 1);
+
+    // Цвет (обновляем текстуру без пересоздания объекта)
+    const isBright = target > 1.5;
+    const desiredColor = isBright ? 'white' : label.targetScale < 1 ? '#044' : label.defaultColor;
+
+    if (label.currentColor !== desiredColor) {
+      // перерисовываем канвас
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const dim = 128;
+      canvas.width = canvas.height = dim;
+
+      ctx.clearRect(0, 0, dim, dim);
+      ctx.fillStyle = desiredColor;
+      ctx.font = 'bold 80px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label.text, dim / 2, dim / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      label.mesh.material.map.dispose(); // освободим старую текстуру
+      label.mesh.material.map = texture;
+      label.mesh.material.needsUpdate = true;
+
+      label.currentColor = desiredColor;
+    }
+  });
+}
+
 
   // позиция камеры
   camera.position.set(-1.5, 2, -4.5);
