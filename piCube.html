@@ -238,10 +238,37 @@
       if (resumeAutoAfterDrag) autoRotate = true;
     });
 
-    // Обновление радиуса при зуме / панорамировании
+
+
+    // Add listener for zoom start (wheel or touch)
+    renderer.domElement.addEventListener('wheel', () => {
+      resumeAutoAfterDrag = autoRotate;
+      autoRotate = false;
+    });
+
+    // For touch gestures (pinch zoom)
+    renderer.domElement.addEventListener('touchstart', () => {
+      resumeAutoAfterDrag = autoRotate;
+      autoRotate = false;
+    });
+
+    // On every controls change, update radius and maybe resume
     controls.addEventListener('change', () => {
       radius = camera.position.length();
+
+      // If zoom finished (distance changed) and we had autorotate before
+      if (!autoRotate && resumeAutoAfterDrag) {
+        clearTimeout(controls._resumeTimer);
+        controls._resumeTimer = setTimeout(() => {
+          recalcRotateAxis();
+          autoRotate = true;
+        }, 400); // delay in ms to avoid flicker while zooming
+      }
     });
+
+
+
+
 
     // === Анимация ===
     function animate() {
