@@ -245,13 +245,13 @@
     // Add listener for zoom start (wheel or touch)
     renderer.domElement.addEventListener('wheel', () => {
       resumeAutoAfterDrag = autoRotate;
-      autoRotate = false;
+//      autoRotate = false;
     });
 
     // For touch gestures (pinch zoom)
     renderer.domElement.addEventListener('touchstart', () => {
       resumeAutoAfterDrag = autoRotate;
-      autoRotate = false;
+//      autoRotate = false;
     });
 
     // On every controls change, update radius and maybe resume
