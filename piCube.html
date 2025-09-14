@@ -14,45 +14,57 @@
       background: #111;
     }
 
-
-    /* По умолчанию (вертикальная ориентация — кнопки в колонку) */
-.buttons {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column; /* вертикально */
-  gap: 8px;
-  z-index: 1;
-}
-
-/* Горизонтальная ориентация (кнопки в ряд сбоку) */
-@media (orientation: landscape) {
-  .buttons {
-    top: 50%;
-    left: 10px;
-    transform: translateY(-50%);
-    flex-direction: column; /* оставляем колонку */
-    align-items: flex-start;
-  }
-}
-
-/* Вертикальная ориентация — можно делать кнопки широкими */
-@media (orientation: portrait) {
-  .buttons {
-    flex-direction: row;   /* в ряд сверху */
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
-
+    /* Общие стили кнопок */
     .buttons button {
-  flex: initial;       /* кнопка под размер текста */
-  width: auto;         /* не растягивается */
-  min-width: 60px;     /* можно задать минимальную ширину */
-}
+      background: #0288d1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 12px;
+      transition: background 0.2s;
+    }
+
+    .buttons button:hover {
+      background: #03a9f4;
+    }
+
+    /* Портретная ориентация */
+    @media (orientation: portrait) {
+      .buttons {
+        flex-direction: row;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 95%;
+        /* растягиваем контейнер почти на всю ширину */
+      }
+
+      .buttons button {
+        flex: 1;
+        /* каждая кнопка занимает одинаковую долю */
+        min-height: 60px;
+        /* делаем их крупнее по высоте */
+      }
+    }
+
+    /* Альбомная ориентация */
+    @media (orientation: landscape) {
+      .buttons {
+        flex-direction: column;
+        top: 50%;
+        left: 10px;
+        transform: translateY(-50%);
+        width: auto;
+      }
+
+      .buttons button {
+        min-width: 120px;
+        /* чтобы они были читабельными сбоку */
+        min-height: 40px;
+      }
+    }
   </style>
   <script type="importmap">
 {
@@ -321,18 +333,18 @@
     }
 
     // === Горячие клавиши для выделения плоскостей ===
-      // 1–5: z=0..4
-      // 0: сброс выделения
-      window.addEventListener("keydown", (event) => {
-        const key = event.key;
+    // 1–5: z=0..4
+    // 0: сброс выделения
+    window.addEventListener("keydown", (event) => {
+      const key = event.key;
 
-        if (key >= "1" && key <= "5") {
-          const planeIndex = parseInt(key, 10) - 1;
-          highlightPlane("z", planeIndex, document.querySelectorAll(".buttons button")[planeIndex]);
-        } else if (key === "0") {
-          highlightPlane(null, null, document.querySelectorAll(".buttons button")[5]); // кнопка "---"
-        }
-      });
+      if (key >= "1" && key <= "5") {
+        const planeIndex = parseInt(key, 10) - 1;
+        highlightPlane("z", planeIndex, document.querySelectorAll(".buttons button")[planeIndex]);
+      } else if (key === "0") {
+        highlightPlane(null, null, document.querySelectorAll(".buttons button")[5]); // кнопка "---"
+      }
+    });
   </script>
 </body>
 
