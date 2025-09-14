@@ -186,25 +186,29 @@
     camera.position.set(-1.5, 2, -4.5);
     camera.lookAt(0, 0, 0);
 
+
+
+
+
+
+
     // ==== Автовращение вокруг произвольной оси ====
-    let autoRotate = true;                           // начально — выкл
-    let rotateAxis = new THREE.Vector3(0, 1, 0);      // ось по умолчанию
-    let radius = camera.position.length();            // текущая дистанция
-    let resumeAutoAfterDrag = true;                  // запоминание состояния при ручном вращении
+    let autoRotate = true;                          // начально — выкл
+    let rotateAxis = new THREE.Vector3(0, 1, 0);     // ось по умолчанию
+    let radius = camera.position.length();           // текущая дистанция
+    let resumeAutoAfterDrag = true;                  // запоминание состояния при ручном управлении
 
     // Пересчитать ось вращения:
-    // Берём направление на камеру (от центра к камере) и поворачиваем его
-    // на небольшой угол вокруг вектора, перпендикулярного этому направлению.
+    // направление на камеру → поворачиваем немного относительно перпендикуляра
     function recalcRotateAxis(tilt = 0.06) {
-      const dir = camera.position.clone().normalize();    // направление на камеру
+      const dir = camera.position.clone().normalize(); // направление на камеру
       let up = new THREE.Vector3(0, 1, 0);
-      if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0);  // избежим параллельности
+      if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0); // избежим параллельности
 
-      const perp = new THREE.Vector3().crossVectors(dir, up).normalize(); // перпендикуляр к dir
-      const q = new THREE.Quaternion().setFromAxisAngle(perp, tilt);      // малый поворот вокруг perp
-      rotateAxis.copy(dir).applyQuaternion(q).normalize();                // "слегка наклонённая" ось
+      const perp = new THREE.Vector3().crossVectors(dir, up).normalize();
+      const q = new THREE.Quaternion().setFromAxisAngle(perp, tilt);
+      rotateAxis.copy(dir).applyQuaternion(q).normalize();
 
-      // На всякий случай — fallback
       if (!isFinite(rotateAxis.x) || !isFinite(rotateAxis.y) || !isFinite(rotateAxis.z)) {
         rotateAxis.set(0, 1, 0);
       }
@@ -218,58 +222,56 @@
       if (autoRotate) {
         recalcRotateAxis();
         radius = camera.position.length();
-        controls.enabled = true;//false; // чтобы не конфликтовать
-      } else {
-        controls.enabled = true;
       }
     };
 
-    // Во время ручного управления — ставим авто на паузу,
-    // после окончания — пересчитываем ось и (если нужно) возобновляем
+    // При начале ручного вращения — пауза
     controls.addEventListener('start', () => {
       resumeAutoAfterDrag = autoRotate;
       autoRotate = false;
-      controls.enabled = true;  // пользователь рулит
     });
 
+    // При завершении — вернуть автовращение, если было активно
     controls.addEventListener('end', () => {
       recalcRotateAxis();
       radius = camera.position.length();
-      if (resumeAutoAfterDrag) {
-        autoRotate = true;
-        controls.enabled = true;// false; // снова только авто
-      }
+      if (resumeAutoAfterDrag) autoRotate = true;
     });
 
-    // Если пользователь зумит/двигает — обновим радиус
+    // Обновление радиуса при зуме / панорамировании
     controls.addEventListener('change', () => {
       radius = camera.position.length();
     });
 
-    // анимация масштаба и яркости
-    function updateScalesAndColorsOLD() {
-      labels.forEach(label => {
-        const current = label.mesh.scale.x;
-        const target = label.targetScale;
-        const newScale = THREE.MathUtils.lerp(current, target, 0.15);
-        label.mesh.scale.set(newScale, newScale, 1);
+    // === Анимация ===
+    function animate() {
+      requestAnimationFrame(animate);
 
-        const isBright = target > 1.5;
-        const desiredColor = isBright ? 'white' : label.targetScale < 1 ? '#044' : label.defaultColor;
+      if (autoRotate) {
+        const step = 0.02; // скорость автовращения (рад/кадр)
+        const q = new THREE.Quaternion().setFromAxisAngle(rotateAxis, step);
+        camera.position.applyQuaternion(q);
+        camera.position.setLength(radius); // сохраняем дистанцию
+        camera.lookAt(0, 0, 0);
+      } else {
+        controls.update(); // плавность OrbitControls
+      }
 
-        if (label.currentColor !== desiredColor) {
-          const newLabel = createNumberPlane(label.text, desiredColor, 0.2);
-          newLabel.position.copy(label.mesh.position);
-          newLabel.scale.copy(label.mesh.scale);
-          newLabel.lookAt(label.mesh.position.x, label.mesh.position.y, label.mesh.position.z - 1);
-          scene.remove(label.mesh);
-          scene.add(newLabel);
-          label.mesh = newLabel;
-          label.currentColor = desiredColor;
-        }
-      });
+      updateScalesAndColors();
+      renderer.render(scene, camera);
     }
+    animate();
 
+
+
+
+
+
+
+
+
+
+    // анимация масштаба и яркости
     function updateScalesAndColors() {
       labels.forEach(label => {
         // Масштаб
@@ -306,26 +308,6 @@
       });
     }
 
-
-    // === Анимация ===
-    function animate() {
-      requestAnimationFrame(animate);
-
-      if (autoRotate) {
-        const step = 0.02; // скорость автовращения (радиан на кадр)
-        const q = new THREE.Quaternion().setFromAxisAngle(rotateAxis, step);
-        camera.position.applyQuaternion(q);
-        camera.position.setLength(radius); // держим постоянную дистанцию
-        camera.lookAt(0, 0, 0);
-      } else {
-        controls.update(); // плавность OrbitControls
-      }
-
-      updateScalesAndColors();
-      //controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
 
     // === Подгонка окна ===
     window.addEventListener('resize', () => {
