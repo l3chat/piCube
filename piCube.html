@@ -14,17 +14,39 @@
       background: #111;
     }
 
-    .buttons {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 1;
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
+
+    /* По умолчанию (вертикальная ориентация — кнопки в колонку) */
+.buttons {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column; /* вертикально */
+  gap: 8px;
+  z-index: 1;
+}
+
+/* Горизонтальная ориентация (кнопки в ряд сбоку) */
+@media (orientation: landscape) {
+  .buttons {
+    top: 50%;
+    left: 10px;
+    transform: translateY(-50%);
+    flex-direction: column; /* оставляем колонку */
+    align-items: flex-start;
+  }
+}
+
+/* Вертикальная ориентация — можно делать кнопки широкими */
+@media (orientation: portrait) {
+  .buttons {
+    flex-direction: row;   /* в ряд сверху */
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+}
 
     .buttons button {
   flex: initial;       /* кнопка под размер текста */
