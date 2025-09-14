@@ -235,9 +235,10 @@
 
     // При завершении — вернуть автовращение, если было активно
     controls.addEventListener('end', () => {
-      recalcRotateAxis();
       radius = camera.position.length();
-      if (resumeAutoAfterDrag) autoRotate = true;
+      recalcRotateAxis();
+//      if (resumeAutoAfterDrag) autoRotate = true;
+      autoRotate = true;
     });
 
 
