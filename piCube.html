@@ -51,6 +51,7 @@
   <button onclick="highlightPlane('z', 3, this)">-4-</button>
   <button onclick="highlightPlane('z', 4, this)">-5-</button>
   <button onclick="highlightPlane(null, null, this)">---</button>
+  <button onclick="toggleAutoRotate(this)">⟳</button>
 </div>
 
 <script type="module">
@@ -131,6 +132,65 @@
     }
   }
 
+  // ==== Автовращение вокруг произвольной оси ====
+let autoRotate = false;                           // начально — выкл
+let rotateAxis = new THREE.Vector3(0, 1, 0);      // ось по умолчанию
+let radius = camera.position.length();            // текущая дистанция
+let resumeAutoAfterDrag = false;                  // запоминание состояния при ручном вращении
+
+// Пересчитать ось вращения:
+// Берём направление на камеру (от центра к камере) и поворачиваем его
+// на небольшой угол вокруг вектора, перпендикулярного этому направлению.
+function recalcRotateAxis(tilt = 0.12) {
+  const dir = camera.position.clone().normalize();    // направление на камеру
+  let up = new THREE.Vector3(0, 1, 0);
+  if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0);  // избежим параллельности
+
+  const perp = new THREE.Vector3().crossVectors(dir, up).normalize(); // перпендикуляр к dir
+  const q = new THREE.Quaternion().setFromAxisAngle(perp, tilt);      // малый поворот вокруг perp
+  rotateAxis.copy(dir).applyQuaternion(q).normalize();                // "слегка наклонённая" ось
+
+  // На всякий случай — fallback
+  if (!isFinite(rotateAxis.x) || !isFinite(rotateAxis.y) || !isFinite(rotateAxis.z)) {
+    rotateAxis.set(0, 1, 0);
+  }
+}
+
+// Кнопка-переключатель
+window.toggleAutoRotate = function (button) {
+  autoRotate = !autoRotate;
+  button?.classList.toggle('active', autoRotate);
+  if (autoRotate) {
+    recalcRotateAxis();
+    radius = camera.position.length();
+    controls.enabled = false; // чтобы не конфликтовать
+  } else {
+    controls.enabled = true;
+  }
+};
+
+// Во время ручного управления — ставим авто на паузу,
+// после окончания — пересчитываем ось и (если нужно) возобновляем
+controls.addEventListener('start', () => {
+  resumeAutoAfterDrag = autoRotate;
+  autoRotate = false;
+  controls.enabled = true;  // пользователь рулит
+});
+
+controls.addEventListener('end', () => {
+  recalcRotateAxis();
+  radius = camera.position.length();
+  if (resumeAutoAfterDrag) {
+    autoRotate = true;
+    controls.enabled = false; // снова только авто
+  }
+});
+
+// Если пользователь зумит/двигает — обновим радиус
+controls.addEventListener('change', () => {
+  radius = camera.position.length();
+});
+
   // анимация масштаба и яркости
   function updateScalesAndColorsOLD() {
     labels.forEach(label => {
@@ -199,8 +259,19 @@
   // === Анимация ===
   function animate() {
     requestAnimationFrame(animate);
+
+  if (autoRotate) {
+    const step = 0.02; // скорость автовращения (радиан на кадр)
+    const q = new THREE.Quaternion().setFromAxisAngle(rotateAxis, step);
+    camera.position.applyQuaternion(q);
+    camera.position.setLength(radius); // держим постоянную дистанцию
+    camera.lookAt(0, 0, 0);
+  } else {
+    controls.update(); // плавность OrbitControls
+  }
+
     updateScalesAndColors();
-    controls.update();
+    //controls.update();
     renderer.render(scene, camera);
   }
   animate();
