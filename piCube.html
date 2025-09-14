@@ -133,10 +133,10 @@
   }
 
   // ==== Автовращение вокруг произвольной оси ====
-let autoRotate = false;                           // начально — выкл
+let autoRotate = true;                           // начально — выкл
 let rotateAxis = new THREE.Vector3(0, 1, 0);      // ось по умолчанию
 let radius = camera.position.length();            // текущая дистанция
-let resumeAutoAfterDrag = false;                  // запоминание состояния при ручном вращении
+let resumeAutoAfterDrag = true;                  // запоминание состояния при ручном вращении
 
 // Пересчитать ось вращения:
 // Берём направление на камеру (от центра к камере) и поворачиваем его
