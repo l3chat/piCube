@@ -163,7 +163,7 @@ window.toggleAutoRotate = function (button) {
   if (autoRotate) {
     recalcRotateAxis();
     radius = camera.position.length();
-    controls.enabled = false; // чтобы не конфликтовать
+    controls.enabled = true;//false; // чтобы не конфликтовать
   } else {
     controls.enabled = true;
   }
@@ -182,7 +182,7 @@ controls.addEventListener('end', () => {
   radius = camera.position.length();
   if (resumeAutoAfterDrag) {
     autoRotate = true;
-    controls.enabled = false; // снова только авто
+    controls.enabled = true;// false; // снова только авто
   }
 });
 
