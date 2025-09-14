@@ -227,9 +227,12 @@
       }
     };
 
+
+    let isZooming = false;
     // При начале ручного вращения — пауза
     controls.addEventListener('start', () => {
-      resumeAutoAfterDrag = autoRotate;
+      if(!isZooming) resumeAutoAfterDrag = autoRotate;
+      isZooming = true;
       autoRotate = false;
     });
 
@@ -237,8 +240,9 @@
     controls.addEventListener('end', () => {
       radius = camera.position.length();
       recalcRotateAxis();
-//      if (resumeAutoAfterDrag) autoRotate = true;
-      autoRotate = true;
+      if (resumeAutoAfterDrag) autoRotate = true;
+      isZooming = false;
+//      autoRotate = true;
     });
 
 
