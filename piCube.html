@@ -58,6 +58,7 @@
         /* равномерное деление ширины */
         min-height: 120px;
         /* крупнее по высоте */
+        font-size: clamp(18px, 5vw, 36px);
       }
     }
 
@@ -197,7 +198,6 @@
     let autoRotate = true;                          // начально — выкл
     let rotateAxis = new THREE.Vector3(0, 1, 0);     // ось по умолчанию
     let radius = camera.position.length();           // текущая дистанция
-    let lastRadius = radius;
     let resumeAutoAfterDrag = true;                  // запоминание состояния при ручном управлении
 
     // Пересчитать ось вращения:
