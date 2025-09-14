@@ -242,44 +242,8 @@
       recalcRotateAxis();
       if (resumeAutoAfterDrag) autoRotate = true;
       isZooming = false;
-//      autoRotate = true;
     });
-
-
-
-    // Add listener for zoom start (wheel or touch)
-    renderer.domElement.addEventListener('wheel', () => {
-      //      resumeAutoAfterDrag = autoRotate;
-      //      autoRotate = false;
-    });
-
-    // For touch gestures (pinch zoom)
-    renderer.domElement.addEventListener('touchstart', () => {
-      //      resumeAutoAfterDrag = autoRotate;
-      //      autoRotate = false;
-    });
-
-    // On every controls change, update radius and maybe resume
     controls.enableZoom = true; // allow zoom (already default)
-    controls.addEventListener('change', () => {
-      radius = camera.position.length(); // keep autorotation radius correct
-    });
-/*    controls.addEventListener('change', () => {
-      radius = camera.position.length();
-
-      // If zoom finished (distance changed) and we had autorotate before
-      if (!autoRotate && radius !== lastRadius) {
-        clearTimeout(controls._resumeTimer);
-        controls._resumeTimer = setTimeout(() => {
-          recalcRotateAxis();
-          //          if (resumeAutoAfterDrag) autoRotate = true;
-          //          autoRotate = true;
-          //          lastRadius = radius;
-        }, 400); // delay in ms to avoid flicker while zooming
-      }
-    });
-*/
-
 
 
 
