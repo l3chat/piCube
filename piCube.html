@@ -244,13 +244,13 @@
 
     // Add listener for zoom start (wheel or touch)
     renderer.domElement.addEventListener('wheel', () => {
-      resumeAutoAfterDrag = autoRotate;
+//      resumeAutoAfterDrag = autoRotate;
 //      autoRotate = false;
     });
 
     // For touch gestures (pinch zoom)
     renderer.domElement.addEventListener('touchstart', () => {
-      resumeAutoAfterDrag = autoRotate;
+//      resumeAutoAfterDrag = autoRotate;
 //      autoRotate = false;
     });
 
@@ -263,9 +263,9 @@
         clearTimeout(controls._resumeTimer);
         controls._resumeTimer = setTimeout(() => {
           recalcRotateAxis();
-          if (resumeAutoAfterDrag) autoRotate = true;
+//          if (resumeAutoAfterDrag) autoRotate = true;
 //          autoRotate = true;
-          lastRadius = radius;
+//          lastRadius = radius;
         }, 400); // delay in ms to avoid flicker while zooming
       }
     });
