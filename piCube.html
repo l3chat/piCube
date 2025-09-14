@@ -56,7 +56,7 @@
       .buttons button {
         flex: 1;
         /* равномерное деление ширины */
-        min-height: 160px;
+        min-height: 120px;
         /* крупнее по высоте */
       }
     }
@@ -197,6 +197,7 @@
     let autoRotate = true;                          // начально — выкл
     let rotateAxis = new THREE.Vector3(0, 1, 0);     // ось по умолчанию
     let radius = camera.position.length();           // текущая дистанция
+    let lastRadius = radius;
     let resumeAutoAfterDrag = true;                  // запоминание состояния при ручном управлении
 
     // Пересчитать ось вращения:
@@ -258,11 +259,13 @@
       radius = camera.position.length();
 
       // If zoom finished (distance changed) and we had autorotate before
-      if (!autoRotate && resumeAutoAfterDrag) {
+      if (!autoRotate && radius !== lastRadius) {
         clearTimeout(controls._resumeTimer);
         controls._resumeTimer = setTimeout(() => {
           recalcRotateAxis();
-          autoRotate = true;
+          if (resumeAutoAfterDrag) autoRotate = true;
+//          autoRotate = true;
+          lastRadius = radius;
         }, 400); // delay in ms to avoid flicker while zooming
       }
     });
