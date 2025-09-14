@@ -14,17 +14,14 @@
       background: #111;
     }
 
-    /* Общий контейнер для кнопок */
+    /* Общие стили кнопок */
     .buttons {
       position: absolute;
-      /* нужно для фиксации поверх canvas */
       z-index: 1;
       display: flex;
-      /* flex-контейнер */
       gap: 6px;
     }
 
-    /* Общие стили кнопок */
     .buttons button {
       background: #0288d1;
       color: #fff;
@@ -34,8 +31,11 @@
       cursor: pointer;
       padding: 12px;
       transition: background 0.2s;
-      width: auto;
-      /* отменяем pico width:100% */
+      display: flex;
+      align-items: center;
+      /* выравнивание по вертикали */
+      justify-content: center;
+      /* выравнивание по горизонтали */
     }
 
     .buttons button:hover {
@@ -50,11 +50,14 @@
         left: 50%;
         transform: translateX(-50%);
         width: 95%;
+        /* почти на всю ширину */
       }
 
       .buttons button {
         flex: 1;
+        /* равномерное деление ширины */
         min-height: 60px;
+        /* крупнее по высоте */
       }
     }
 
@@ -63,18 +66,19 @@
       .buttons {
         flex-direction: column;
         top: 0;
-        bottom: 0;
         left: 10px;
         transform: none;
-        justify-content: space-evenly;
-        /* равномерное распределение */
+        height: 100%;
+        /* контейнер занимает всю высоту */
       }
 
       .buttons button {
         flex: 1;
-        /* каждая кнопка делит пространство */
-        min-height: 0;
-        /* разрешаем уменьшаться */
+        /* кнопки равномерно делят высоту */
+        min-height: 40px;
+        /* но не меньше */
+        margin: 2px 0;
+        /* маленький отступ между кнопками */
       }
     }
   </style>
