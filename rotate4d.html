@@ -117,37 +117,51 @@
     scene.add(left, mid, right);
     for (const g of [left, mid, right]) { g.rotation.x = -0.25; g.rotation.y = 0.35; }
 
-    /* ===== хвосты из сфер ===== */
-    function makeSphereTrail(maxPoints = 600, baseRadius = 0.04) {
-      const spheres = [];
-      for (let i = 0; i < maxPoints; i++) {
-        const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
-        const geo = new THREE.SphereGeometry(baseRadius, 8, 8);
-        const mesh = new THREE.Mesh(geo, mat);
+    
+// --- ХВОСТЫ ИЗ СФЕР (исправленная ориентация): новая точка -> в начало массива ---
+function makeSphereTrail(maxPoints = 600, baseRadius = 0.04, minScale = 0.25, maxScale = 1.0, fadeGamma = 1.6) {
+  // геометрия/материал можно переиспользовать (экономит память)
+  const sharedGeo = new THREE.SphereGeometry(baseRadius, 12, 12);
+  const sharedMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
+
+  const spheres = [];
+  for (let i = 0; i < maxPoints; i++) {
+    const m = new THREE.Mesh(sharedGeo, sharedMat.clone());
+    m.visible = false;
+    scene.add(m);
+    spheres.push(m);
+  }
+
+  // ВАЖНО: держим точки так, что points[0] — САМЫЙ НОВЫЙ сэмпл (голова хвоста)
+  const points = [];
+
+  function push(pos) {
+    // кладём новый сэмпл в начало
+    points.unshift(pos.clone());
+    if (points.length > maxPoints) points.pop();
+
+    const N = points.length;
+    // обновляем сферы по индексу i:
+    // i = 0  -> новая точка (у головы, ярче/крупнее),
+    // i = N-1-> самая старая (тусклее/мельче)
+    for (let i = 0; i < maxPoints; i++) {
+      const mesh = spheres[i];
+      if (i < N) {
+        const age01 = (N > 1) ? 1 - (i / (N - 1)) : 1; // 1 у новой, 0 у самой старой
+        const fade = Math.pow(age01, fadeGamma);       // плавное затухание
+        mesh.visible = true;
+        mesh.position.copy(points[i]);
+        mesh.scale.setScalar(minScale + (maxScale - minScale) * fade);
+        mesh.material.opacity = fade;
+      } else {
         mesh.visible = false;
-        scene.add(mesh);
-        spheres.push(mesh);
       }
-      const points = [];
-      function push(pos) {
-        points.push(pos.clone());
-        if (points.length > maxPoints) points.shift();
-        // обновляем сферы
-        for (let i = 0; i < maxPoints; i++) {
-          const mesh = spheres[i];
-          if (i < points.length) {
-            const age = (points.length - 1 - i) / maxPoints; // 1 у новых, 0 у старых
-            mesh.visible = true;
-            mesh.position.copy(points[points.length - 1 - i]);
-            mesh.scale.setScalar(0.3 + 0.7 * age); // уменьшается с возрастом
-            mesh.material.opacity = age;         // затухает
-          } else {
-            mesh.visible = false;
-          }
-        }
-      }
-      return { push };
     }
+  }
+
+  return { push };
+}
+
     const trailL = makeSphereTrail(600), trailM = makeSphereTrail(600), trailR = makeSphereTrail(600);
 
     // маркеры вершин
