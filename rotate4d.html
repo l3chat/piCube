@@ -204,7 +204,7 @@
         updateWire(right, verts3);
         const p = verts3[0].clone().add(right.position);
         markerR.position.copy(p);
-        trailR.add(p);//  push(p);
+        trailR.unshift(p);//  push(p);
       }
 
       renderer.render(scene, camera);
