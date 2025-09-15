@@ -15,6 +15,8 @@
 
     canvas {
       display: block;
+      z-index: 0;
+      position: relative;
     }
 
     .label {
@@ -26,7 +28,6 @@
       opacity: .9;
       pointer-events: none;
       z-index: 10;
-      /* теперь надписи поверх канваса */
     }
 
     #l1 {
@@ -202,13 +203,12 @@
         for (let i = 0; i < N; i++) {
           const age = 1 - i / (N - 1 || 1);
           dummy.position.copy(points[i]);
-          const s = 0.15 + 0.6 * age;
+          const s = 0.2 * age + 0.05; // хвост уменьшается
           dummy.scale.set(s, s, s);
           dummy.updateMatrix();
           mesh.setMatrixAt(i, dummy.matrix);
-          const c = baseColor.clone();
+          const c = baseColor.clone().lerp(new THREE.Color(0, 0, 0), 1 - age * 0.7);
           mesh.instanceColor.setXYZ(i, c.r, c.g, c.b);
-          mesh.material.opacity = age; // затухание по прозрачности
         }
         mesh.count = N;
         mesh.instanceMatrix.needsUpdate = true;
