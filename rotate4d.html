@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>4D Rotations Projection — Three.js</title>
+  <style>
+    html, body { height: 100%; margin: 0; background: #0b0f14; color: #e6edf3; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
+    #app { position: fixed; inset: 0; display: grid; grid-template-rows: auto 1fr; }
+    header { padding: 10px 16px; display: flex; gap: 16px; align-items: center; border-bottom: 1px solid #1f2a35; background: #0f141a; }
+    header h1 { font-size: 16px; margin: 0; font-weight: 600; letter-spacing: .2px; color: #e6edf3; }
+    header .hint { opacity: .75; font-size: 12px; }
+    canvas { display: block; }
+    .label { position: absolute; padding: 6px 10px; background: rgba(15,20,26,.75); border: 1px solid #1f2a35; border-radius: 10px; font-size: 12px; backdrop-filter: blur(4px); pointer-events: none; }
+    .legend { position: absolute; right: 12px; top: 56px; font-size: 12px; line-height: 1.5; background: rgba(15,20,26,.75); border: 1px solid #1f2a35; border-radius: 10px; padding: 8px 10px; max-width: 260px; }
+    a { color: #8ab4ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>4D Rotations Projected to 3D — Three.js</h1>
+    <div class="hint">Drag to orbit • Scroll to zoom • Double‑click to focus</div>
+  </header>
+  <div id="container"></div>
+  <div id="label1" class="label">Simple rotation in XY-plane</div>
+  <div id="label2" class="label">Isoclinic rotation (equal angles in XY and ZW)</div>
+  <div id="label3" class="label">Double rotation (different angles in XY and ZW)</div>
+  <div class="legend">
+    <b>What you see</b><br/>
+    Three tesseracts (4D hypercubes) are rotated in 4D, then projected to 3D and drawn as wireframes:
+    <ul>
+      <li><b>Left</b>: rotate only in the XY 2‑plane.</li>
+      <li><b>Center</b>: equal angles in XY and ZW (isoclinic).</li>
+      <li><b>Right</b>: different angles in XY and ZW (double rotation).</li>
+    </ul>
+    We use 4D → 3D perspective projection using the W coordinate.
+  </div>
+</div>
+
+<script type="module">
+  import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+  import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+  // ==== Scene setup ====
+  const container = document.getElementById('container');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight - 44);
+  renderer.setClearColor(0x0b0f14, 1);
+  container.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/(window.innerHeight-44), 0.1, 100);
+  camera.position.set(0, 0.6, 8);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.06;
+
+  // Lighting (subtle for line materials with some emissive effect simulated via vertex colors)
+  const hemi = new THREE.HemisphereLight(0x99bbff, 0x223344, 0.6);
+  scene.add(hemi);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.3);
+  dir.position.set(2,2,2);
+  scene.add(dir);
+
+  // Grid & axes (optional subtle references)
+  const grid = new THREE.GridHelper(24, 24, 0x2a3643, 0x1a232d);
+  grid.position.y = -2.2;
+  scene.add(grid);
+
+  // ==== 4D math helpers ====
+  // A 4D vector is a plain array [x,y,z,w]. We'll project to 3D using perspective along W.
+  function mat4Identity(){
+    return [
+      1,0,0,0,
+      0,1,0,0,
+      0,0,1,0,
+      0,0,0,1
+    ];
+  }
+
+  function mat4Mul(A,B){
+    const C = new Array(16).fill(0);
+    for (let r=0;r<4;r++) {
+      for (let c=0;c<4;c++) {
+        for (let k=0;k<4;k++) C[4*r+c] += A[4*r+k]*B[4*k+c];
+      }
+    }
+    return C;
+  }
+
+  function rot4XY(theta){
+    const c=Math.cos(theta), s=Math.sin(theta);
+    return [ c,-s, 0, 0,
+             s, c, 0, 0,
+             0, 0, 1, 0,
+             0, 0, 0, 1 ];
+  }
+  function rot4ZW(phi){
+    const c=Math.cos(phi), s=Math.sin(phi);
+    return [ 1, 0, 0, 0,
+             0, 1, 0, 0,
+             0, 0, c,-s,
+             0, 0, s, c ];
+  }
+
+  function mat4VecMul(M, v){
+    const [x,y,z,w]=v; const out=[0,0,0,0];
+    out[0]=M[0]*x+M[1]*y+M[2]*z+M[3]*w;
+    out[1]=M[4]*x+M[5]*y+M[6]*z+M[7]*w;
+    out[2]=M[8]*x+M[9]*y+M[10]*z+M[11]*w;
+    out[3]=M[12]*x+M[13]*y+M[14]*z+M[15]*w;
+    return out;
+  }
+
+  // Perspective 4D->3D using w: scale = f/(f - w)
+  const f = 3.2; // camera-like distance in W
+  function project4Dto3D(v){
+    const [x,y,z,w]=v;
+    const denom = (f - w);
+    const s = denom !== 0 ? (f / denom) : 1e6; // avoid division by zero
+    return new THREE.Vector3(x*s, y*s, z*s);
+  }
+
+  // ==== Build a tesseract (vertices + edges) ====
+  function tesseractVertices(size=1){
+    const s=size; const verts=[];
+    for (let x of [-s,s])
+    for (let y of [-s,s])
+    for (let z of [-s,s])
+    for (let w of [-s,s])
+      verts.push([x,y,z,w]);
+    return verts; // length 16
+  }
+  // Two vertices are connected if they differ in exactly one coordinate
+  function tesseractEdges(verts){
+    const edges=[];
+    for (let i=0;i<verts.length;i++){
+      for (let j=i+1;j<verts.length;j++){
+        let diff=0;
+        for (let k=0;k<4;k++) if (verts[i][k]!==verts[j][k]) diff++;
+        if (diff===1) edges.push([i,j]);
+      }
+    }
+    return edges; // length 32
+  }
+
+  const V4 = tesseractVertices(0.9);
+  const E = tesseractEdges(V4);
+
+  // ==== Create three wireframe objects for the three rotations ====
+  function makeWire(color){
+    const geom = new THREE.BufferGeometry();
+    const positions = new Float32Array(E.length * 2 * 3); // 2 endpoints * 3 coords
+    geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.LineBasicMaterial({ color, linewidth: 1, transparent: true, opacity: 0.92 });
+    const lines = new THREE.LineSegments(geom, mat);
+    return { geom, lines };
+  }
+
+  const left = makeWire(0x6ab0ff);
+  const mid  = makeWire(0x9cff9c);
+  const right= makeWire(0xffa86a);
+
+  // group and position them
+  const gLeft = new THREE.Group(); gLeft.add(left.lines); gLeft.position.x = -4.2;
+  const gMid  = new THREE.Group(); gMid.add(mid.lines);  gMid.position.x  = 0;
+  const gRight= new THREE.Group(); gRight.add(right.lines); gRight.position.x= 4.2;
+
+  scene.add(gLeft, gMid, gRight);
+
+  // ==== Labels positioning (DOM) ====
+  const label1 = document.getElementById('label1');
+  const label2 = document.getElementById('label2');
+  const label3 = document.getElementById('label3');
+  function placeLabel(el, worldPos){
+    const p = worldPos.clone().project(camera);
+    const x = (p.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
+    const y = ( -p.y * 0.5 + 0.5) * renderer.domElement.clientHeight + 44; // header offset
+    el.style.left = `${x - el.clientWidth/2}px`;
+    el.style.top  = `${y}px`;
+  }
+
+  // ==== Animation ====
+  let t = 0;
+  function updateWire(bufferAttr, verts3){
+    const arr = bufferAttr.array;
+    let idx = 0;
+    for (const [i,j] of E){
+      const a = verts3[i]; const b = verts3[j];
+      arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
+      arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
+    }
+    bufferAttr.needsUpdate = true;
+  }
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const dt = 0.016; t += dt;
+
+    // Angles for the three demos
+    const th1 = t * 0.8;             // left: rotate only in XY
+    const thIso = t * 0.8;           // center: equal in XY and ZW
+    const thA = t * 0.7, thB = t*1.2;// right: different in XY and ZW
+
+    // LEFT: simple rotation in XY
+    {
+      const M = rot4XY(th1); // only XY
+      const verts3 = V4.map(v => project4Dto3D(mat4VecMul(M, v)));
+      updateWire(left.geom.getAttribute('position'), verts3);
+      gLeft.rotation.y = 0.2; // tiny 3D tilt for readability
+    }
+
+    // MIDDLE: isoclinic rotation, equal angles in XY and ZW
+    {
+      const M = mat4Mul(rot4ZW(thIso), rot4XY(thIso));
+      const verts3 = V4.map(v => project4Dto3D(mat4VecMul(M, v)));
+      updateWire(mid.geom.getAttribute('position'), verts3);
+    }
+
+    // RIGHT: double rotation, different angles in XY and ZW
+    {
+      const M = mat4Mul(rot4ZW(thB), rot4XY(thA));
+      const verts3 = V4.map(v => project4Dto3D(mat4VecMul(M, v)));
+      updateWire(right.geom.getAttribute('position'), verts3);
+      gRight.rotation.y = -0.2;
+    }
+
+    controls.update();
+    renderer.render(scene, camera);
+
+    // Update labels
+    placeLabel(label1, new THREE.Vector3().setFromMatrixPosition(gLeft.matrixWorld));
+    placeLabel(label2, new THREE.Vector3().setFromMatrixPosition(gMid.matrixWorld));
+    placeLabel(label3, new THREE.Vector3().setFromMatrixPosition(gRight.matrixWorld));
+  }
+
+  animate();
+
+  // Resize handling
+  function onResize(){
+    const h = window.innerHeight - 44;
+    renderer.setSize(window.innerWidth, h);
+    camera.aspect = window.innerWidth / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', onResize);
+
+  // Double-click to focus a group
+  renderer.domElement.addEventListener('dblclick', (e)=>{
+    const x = (e.clientX / renderer.domElement.clientWidth) * 2 - 1;
+    // simple heuristic: left/center/right thirds
+    const third = renderer.domElement.clientWidth / 3;
+    const i = Math.floor(e.clientX / third);
+    const targets = [gLeft, gMid, gRight];
+    const target = targets[Math.max(0, Math.min(2, i))];
+    controls.target.copy(new THREE.Vector3().setFromMatrixPosition(target.matrixWorld));
+  });
+
+</script>
+</body>
+</html>
