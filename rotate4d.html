@@ -3,13 +3,14 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с хвостами всех вершин</title>
+  <title>Тессеракты с разноцветными хвостами</title>
   <style>
     body {
       margin: 0;
       background: #111;
       color: #eee;
       overflow: hidden;
+      font-family: sans-serif;
     }
 
     canvas {
@@ -18,11 +19,11 @@
 
     .label {
       position: fixed;
-      bottom: 12px;
+      top: 8px;
       width: 33%;
       text-align: center;
-      font-size: 13px;
-      opacity: .85;
+      font-size: 14px;
+      opacity: .9;
       pointer-events: none;
     }
 
@@ -38,25 +39,41 @@
       right: 0;
     }
 
-    #log {
+    #controls {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      max-height: 40%;
-      overflow: auto;
       background: #222;
-      color: #0f0;
-      font-family: monospace;
-      font-size: 12px;
-      margin: 0;
-      padding: 4px;
-      white-space: pre-wrap;
-      z-index: 1000;
+      color: #eee;
+      padding: 6px;
+      font-size: 13px;
+      display: flex;
+      gap: 20px;
+      align-items: center;
+    }
+
+    #controls label {
+      white-space: nowrap;
+    }
+
+    #controls input {
+      flex: 1;
+    }
+
+    #controls button {
+      padding: 4px 10px;
+      background: #444;
+      color: #eee;
+      border: 1px solid #666;
+      cursor: pointer;
+    }
+
+    #controls button:hover {
+      background: #666;
     }
   </style>
 
-  <!-- Import map для Three.js 0.160.0 -->
   <script type="importmap">
   {
     "imports": {
@@ -71,21 +88,32 @@
   <div id="l1" class="label">XY-поворот</div>
   <div id="l2" class="label">Изоклиническое</div>
   <div id="l3" class="label">Двойное</div>
-  <pre id="log"></pre>
+
+  <div id="controls">
+    <label>Хвосты: <input id="countSlider" type="range" min="1" max="16" value="16"></label>
+    <label>Длина: <input id="lenSlider" type="range" min="50" max="600" value="200"></label>
+    <button id="pauseBtn">⏸ Пауза</button>
+  </div>
 
   <script type="module">
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    /* === логгер === */
-    function log(msg) {
-      document.getElementById("log").textContent += msg + "\n";
-    }
-    window.onerror = function (message, source, lineno, colno, error) {
-      log("Ошибка: " + message + " @ " + lineno + ":" + colno);
-    };
+    /* === параметры управления === */
+    let activeTrails = 16;
+    let trailLength = 200;
+    let paused = false;
 
-    log("Страница загружена, инициализация...");
+    document.getElementById("countSlider").addEventListener("input", e => {
+      activeTrails = parseInt(e.target.value);
+    });
+    document.getElementById("lenSlider").addEventListener("input", e => {
+      trailLength = parseInt(e.target.value);
+    });
+    document.getElementById("pauseBtn").addEventListener("click", e => {
+      paused = !paused;
+      e.target.textContent = paused ? "▶ Старт" : "⏸ Пауза";
+    });
 
     /* === сцена === */
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -136,12 +164,26 @@
       line.geometry.attributes.position.needsUpdate = true;
     }
 
+    /* === радуга цветов для вершин === */
+    function rainbowColors(n) {
+      const colors = [];
+      for (let i = 0; i < n; i++) {
+        const hue = i / n;
+        const col = new THREE.Color().setHSL(hue, 1.0, 0.5);
+        colors.push(col);
+      }
+      return colors;
+    }
+    const vertexColors = rainbowColors(16);
+
     /* === хвост InstancedMesh === */
-    function makeInstancedTrail(maxPoints = 200, baseRadius = 0.025) {
-      const geo = new THREE.SphereGeometry(baseRadius, 8, 8);
-      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
-      const mesh = new THREE.InstancedMesh(geo, mat, maxPoints);
+    function makeInstancedTrail(baseColor) {
+      const geo = new THREE.SphereGeometry(0.025, 8, 8);
+      const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 1, vertexColors: true });
+      const mesh = new THREE.InstancedMesh(geo, mat, 600);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
+      mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
       mesh.count = 0;
 
       const dummy = new THREE.Object3D();
@@ -149,18 +191,21 @@
 
       function pushLocal(pos) {
         points.unshift(pos.clone());
-        if (points.length > maxPoints) points.pop();
+        if (points.length > trailLength) points.pop();
         const N = points.length;
         for (let i = 0; i < N; i++) {
           const age = 1 - i / (N - 1 || 1);
           dummy.position.copy(points[i]);
-          const s = 0.2 + 0.8 * age;
+          const s = 0.15 + 0.6 * age;
           dummy.scale.set(s, s, s);
           dummy.updateMatrix();
           mesh.setMatrixAt(i, dummy.matrix);
+          const c = baseColor.clone().multiplyScalar(age);
+          mesh.instanceColor.setXYZ(i, c.r, c.g, c.b);
         }
         mesh.count = N;
         mesh.instanceMatrix.needsUpdate = true;
+        mesh.instanceColor.needsUpdate = true;
       }
       return { mesh, pushLocal };
     }
@@ -176,11 +221,11 @@
 
       const trails = [], markers = [];
       for (let i = 0; i < 16; i++) {
-        const trail = makeInstancedTrail(200, 0.025);
+        const trail = makeInstancedTrail(vertexColors[i]);
         g.add(trail.mesh);
         trails.push(trail);
         const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12),
-          new THREE.MeshBasicMaterial({ color: 0xffffff }));
+          new THREE.MeshBasicMaterial({ color: vertexColors[i] }));
         g.add(m); markers.push(m);
       }
       scene.add(g);
@@ -205,7 +250,7 @@
     let t = 0;
     function animate() {
       requestAnimationFrame(animate);
-      t += 0.01;
+      if (!paused) t += 0.01;
 
       // 1) XY
       {
@@ -213,14 +258,14 @@
         const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(L.wire, verts3);
-        verts3.forEach((p, i) => { L.markers[i].position.copy(p); L.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => { L.markers[i].visible = i < activeTrails; L.markers[i].position.copy(p); if (i < activeTrails) L.trails[i].pushLocal(p); });
       }
       // 2) изоклиническое
       {
         const qL = qExpAxis(0.8 * t, 'i'), qR = [1, 0, 0, 0];
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(M.wire, verts3);
-        verts3.forEach((p, i) => { M.markers[i].position.copy(p); M.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => { M.markers[i].visible = i < activeTrails; M.markers[i].position.copy(p); if (i < activeTrails) M.trails[i].pushLocal(p); });
       }
       // 3) двойное
       {
@@ -229,7 +274,7 @@
         const qR = qExpAxis(0.5 * (alpha - beta), 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(R.wire, verts3);
-        verts3.forEach((p, i) => { R.markers[i].position.copy(p); R.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => { R.markers[i].visible = i < activeTrails; R.markers[i].position.copy(p); if (i < activeTrails) R.trails[i].pushLocal(p); });
       }
 
       controls.update();
@@ -242,8 +287,6 @@
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
     });
-
-    log("Инициализация завершена, анимация запущена.");
   </script>
 </body>
 
