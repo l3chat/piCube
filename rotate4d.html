@@ -1,90 +1,178 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="utf-8">
-  <title>Три вращающихся тессеракта с гранями</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Три варианта вращения тессеракта</title>
   <style>
-    body { margin:0; background:#111; overflow:hidden; }
-    .label { position:fixed; bottom:12px; width:33%; text-align:center; font-size:13px; color:#eee; opacity:.85; }
-    #l1 { left:0; } #l2 { left:33%; } #l3 { right:0; }
+    body {
+      margin: 0;
+      height: 100%;
+      background: #111;
+      color: #eee;
+      font-family: system-ui, sans-serif;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .note {
+      position: fixed;
+      left: 10px;
+      top: 10px;
+      font-size: 13px;
+      opacity: .85;
+    }
+
+    .label {
+      position: fixed;
+      bottom: 12px;
+      width: 33%;
+      text-align: center;
+      font-size: 13px;
+      opacity: .8;
+    }
+
+    #l1 {
+      left: 0;
+    }
+
+    #l2 {
+      left: 33%;
+    }
+
+    #l3 {
+      right: 0;
+    }
   </style>
 </head>
+
 <body>
-<div id="l1" class="label">XY-поворот (ZW фикс.)</div>
-<div id="l2" class="label">Изоклиническое</div>
-<div id="l3" class="label">Двойное</div>
+  <div class="note">Слева — XY, центр — изоклиническое, справа — двойное.</div>
+  <div id="l1" class="label">XY-поворот</div>
+  <div id="l2" class="label">Изоклиническое</div>
+  <div id="l3" class="label">Двойное</div>
 
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script>
-const renderer=new THREE.WebGLRenderer({antialias:true});
-renderer.setSize(window.innerWidth,window.innerHeight);
-document.body.appendChild(renderer.domElement);
-const scene=new THREE.Scene();
-const camera=new THREE.PerspectiveCamera(45,window.innerWidth/window.innerHeight,0.1,100);
-camera.position.set(0,0,15);
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script>
+    // ==== базовая сцена ====
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 13);
 
-// === 4D helpers ===
-function rotXY(th){const c=Math.cos(th),s=Math.sin(th);return[
- c,-s,0,0, s,c,0,0, 0,0,1,0, 0,0,0,1];}
-function rotZW(ph){const c=Math.cos(ph),s=Math.sin(ph);return[
- 1,0,0,0, 0,1,0,0, 0,0,c,-s, 0,0,s,c];}
-function matMul(A,B){const C=new Array(16).fill(0);
- for(let i=0;i<4;i++)for(let j=0;j<4;j++)for(let k=0;k<4;k++)C[i*4+j]+=A[i*4+k]*B[k*4+j];
- return C;}
-function matVec(M,v){const[x,y,z,w]=v;return[
- M[0]*x+M[1]*y+M[2]*z+M[3]*w,
- M[4]*x+M[5]*y+M[6]*z+M[7]*w,
- M[8]*x+M[9]*y+M[10]*z+M[11]*w,
- M[12]*x+M[13]*y+M[14]*z+M[15]*w];}
-const d=3.0;
-function project(v){const[x,y,z,w]=v;const s=d/(d-w);return new THREE.Vector3(x*s,y*s,z*s);}
+    // ==== 4D математика ====
+    function rotXY(th) {
+      const c = Math.cos(th), s = Math.sin(th); return [
+        c, -s, 0, 0, s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1
+      ];
+    }
+    function rotZW(ph) {
+      const c = Math.cos(ph), s = Math.sin(ph); return [
+        1, 0, 0, 0, 0, 1, 0, 0, 0, 0, c, -s, 0, 0, s, c
+      ];
+    }
+    function matMul(A, B) {
+      const C = new Array(16).fill(0);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+        for (let k = 0; k < 4; k++) C[i * 4 + j] += A[i * 4 + k] * B[k * 4 + j];
+      }
+      return C;
+    }
+    function matVec(M, v) {
+      const [x, y, z, w] = v;
+      return [
+        M[0] * x + M[1] * y + M[2] * z + M[3] * w,
+        M[4] * x + M[5] * y + M[6] * z + M[7] * w,
+        M[8] * x + M[9] * y + M[10] * z + M[11] * w,
+        M[12] * x + M[13] * y + M[14] * z + M[15] * w
+      ];
+    }
+    const d = 3.0;
+    function project(v) {
+      const [x, y, z, w] = v;
+      const s = d / (d - w);
+      return new THREE.Vector3(x * s, y * s, z * s);
+    }
 
-// === tesseract vertices/edges ===
-function vertices(s=1){const V=[];for(let x of[-s,s])for(let y of[-s,s])for(let z of[-s,s])for(let w of[-s,s])V.push([x,y,z,w]);return V;}
-function edges(V){const E=[];for(let i=0;i<V.length;i++)for(let j=i+1;j<V.length;j++){let diff=0;for(let k=0;k<4;k++)if(V[i][k]!==V[j][k])diff++;if(diff===1)E.push([i,j]);}return E;}
-const V4=vertices(1),E4=edges(V4);
+    // ==== тессеракт ====
+    function vertices(s = 1) {
+      const V = []; for (let x of [-s, s]) for (let y of [-s, s])
+        for (let z of [-s, s]) for (let w of [-s, s]) V.push([x, y, z, w]);
+      return V;
+    }
+    function edges(V) {
+      const E = []; for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+        let diff = 0; for (let k = 0; k < 4; k++) if (V[i][k] !== V[j][k]) diff++;
+        if (diff === 1) E.push([i, j]);
+      }
+      return E;
+    }
 
-// === wireframe builder ===
-function makeWire(color){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(E4.length*2*3),3));const m=new THREE.LineBasicMaterial({color,transparent:true,opacity:0.8});return new THREE.LineSegments(g,m);}
-function updateWire(line,verts3){const arr=line.geometry.attributes.position.array;let idx=0;for(const[i,j]of E4){const a=verts3[i],b=verts3[j];arr[idx++]=a.x;arr[idx++]=a.y;arr[idx++]=a.z;arr[idx++]=b.x;arr[idx++]=b.y;arr[idx++]=b.z;}line.geometry.attributes.position.needsUpdate=true;}
+    const V4 = vertices(1), E4 = edges(V4);
+    function makeWire(color) {
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(E4.length * 2 * 3), 3));
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95 });
+      return new THREE.LineSegments(geom, mat);
+    }
 
-// === cube faces from hypercube ===
-// 8 кубических ячеек тессеракта: фиксируем знак одной координаты
-function cubeCells(){const cells=[];for(let axis=0;axis<4;axis++){for(let sign of[-1,1]){const verts=[];for(let i=0;i<V4.length;i++)if(V4[i][axis]===sign)verts.push(i);cells.push(verts);}}return cells;}
-const C4=cubeCells();
+    const left = makeWire(0x66ccff), mid = makeWire(0x99ff99), right = makeWire(0xff9966);
+    left.position.x = -4.5; right.position.x = 4.5;
+    scene.add(left, mid, right);
 
-// === build three tesseracts (wire + meshes) ===
-function makeGroup(color){const group=new THREE.Group();const wire=makeWire(color);group.add(wire);
-// add colored cube meshes
-const mats=[new THREE.MeshBasicMaterial({color:color,opacity:0.15,transparent:true,side:THREE.DoubleSide})];
-const meshes=C4.map(()=>new THREE.Mesh(new THREE.BufferGeometry(),mats[0]));meshes.forEach(m=>group.add(m));
-group.userData={wire,meshes};return group;}
+    // немного наклона для наглядности
+    for (const g of [left, mid, right]) { g.rotation.x = -0.25; g.rotation.y = 0.35; }
 
-const left=makeGroup(0x66ccff),mid=makeGroup(0x99ff99),right=makeGroup(0xff9966);
-left.position.x=-5;right.position.x=5;scene.add(left,mid,right);
+    function updateWire(line, verts3) {
+      const arr = line.geometry.attributes.position.array; let idx = 0;
+      for (const [i, j] of E4) {
+        const a = verts3[i], b = verts3[j];
+        arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
+        arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
+      }
+      line.geometry.attributes.position.needsUpdate = true;
+    }
 
-// static guides
-const fixedZW=new THREE.Mesh(new THREE.PlaneGeometry(2,2),new THREE.MeshBasicMaterial({color:0xffffff,opacity:0.1,transparent:true,side:THREE.DoubleSide}));fixedZW.position.set(-5,0,0);scene.add(fixedZW);
-const axisX=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(-2,0,0),new THREE.Vector3(2,0,0)]),new THREE.LineBasicMaterial({color:0xff4444}));scene.add(axisX);
-const axisY=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-2,0),new THREE.Vector3(0,2,0)]),new THREE.LineBasicMaterial({color:0x44ff44}));scene.add(axisY);
+    // ==== анимация ====
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.01;
 
-// === update meshes ===
-function updateGroup(group,M){const verts3=V4.map(v=>project(matVec(M,v)));updateWire(group.userData.wire,verts3);
-// update each cube-cell mesh
-group.userData.meshes.forEach((mesh,ci)=>{const indices=C4[ci];const geom=new THREE.ConvexGeometry(indices.map(i=>verts3[i]));mesh.geometry.dispose();mesh.geometry=geom;});}
+      // левый: только XY
+      {
+        const M = rotXY(t * 1.0);
+        const verts3 = V4.map(v => project(matVec(M, v)));
+        updateWire(left, verts3);
+      }
+      // центр: изоклиническое (углы равны)
+      {
+        const M = matMul(rotZW(t * 0.8), rotXY(t * 0.8));
+        const verts3 = V4.map(v => project(matVec(M, v)));
+        updateWire(mid, verts3);
+      }
+      // правый: двойное (углы разные)
+      {
+        const M = matMul(rotZW(t * 0.6), rotXY(t * 1.2));
+        const verts3 = V4.map(v => project(matVec(M, v)));
+        updateWire(right, verts3);
+      }
 
-// convex geometry helper
-THREE.ConvexGeometry=function(points){const geom=new THREE.BufferGeometry().setFromPoints(points);geom.computeBoundingSphere();geom.computeBoundingBox();return geom;};
+      renderer.render(scene, camera);
+    }
+    animate();
 
-// === animate ===
-let t=0;function animate(){requestAnimationFrame(animate);t+=0.01;
- updateGroup(left,rotXY(t*1.0));
- updateGroup(mid,matMul(rotZW(t*0.8),rotXY(t*0.8)));
- updateGroup(right,matMul(rotZW(t*0.6),rotXY(t*1.2)));
- renderer.render(scene,camera);}
-animate();
-
-window.addEventListener('resize',()=>{renderer.setSize(window.innerWidth,window.innerHeight);camera.aspect=window.innerWidth/window.innerHeight;camera.updateProjectionMatrix();});
-</script>
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+  </script>
 </body>
+
 </html>
