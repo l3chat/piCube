@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <title>Три варианта вращения тессеракта с хвостами</title>
+  <title>Три варианта вращения тессеракта с 3D-следами</title>
   <style>
     body {
       margin: 0;
@@ -88,14 +88,14 @@
     function updateWire(line, verts3) { const arr = line.geometry.attributes.position.array; let idx = 0; for (const [i, j] of E4) { const a = verts3[i], b = verts3[j]; arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z; arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z; } line.geometry.attributes.position.needsUpdate = true; }
 
     // ==== хвосты ====
-    function makeTrail(colorHex, maxPoints = 800) {
+    function makeTrail(colorHex, maxPoints = 600) {
       const geom = new THREE.BufferGeometry();
       const positions = new Float32Array(maxPoints * 3);
       const colors = new Float32Array(maxPoints * 3);
       geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true });
-      const line = new THREE.Line(geom, mat); // важно: Line, не LineLoop
+      const line = new THREE.Line(geom, mat); // Line, не LineLoop
       const color = new THREE.Color(colorHex);
       return { line, positions, colors, maxPoints, color, filled: 0 };
     }
@@ -103,18 +103,18 @@
     function updateTrail(trail, pos) {
       const { positions, colors, maxPoints, color } = trail;
 
-      // сдвигаем массив на 1 вперёд
+      // сдвигаем все точки на одну позицию вперёд
       for (let i = 0; i < maxPoints - 1; i++) {
         positions[i * 3 + 0] = positions[(i + 1) * 3 + 0];
         positions[i * 3 + 1] = positions[(i + 1) * 3 + 1];
         positions[i * 3 + 2] = positions[(i + 1) * 3 + 2];
       }
-      // новая точка в конец
+      // добавляем новую точку в конец
       positions[(maxPoints - 1) * 3 + 0] = pos.x;
       positions[(maxPoints - 1) * 3 + 1] = pos.y;
       positions[(maxPoints - 1) * 3 + 2] = pos.z;
 
-      // обновляем цвета
+      // обновляем цвета (от старых тусклых до новых ярких)
       for (let i = 0; i < maxPoints; i++) {
         const age = i / maxPoints; // 0 — старая, 1 — свежая
         colors[i * 3 + 0] = color.r * age;
@@ -128,9 +128,9 @@
     }
 
     // три хвоста
-    const trailL = makeTrail(0x66ccff);
-    const trailM = makeTrail(0x99ff99);
-    const trailR = makeTrail(0xff9966);
+    const trailL = makeTrail(0x66ccff, 600);
+    const trailM = makeTrail(0x99ff99, 600);
+    const trailR = makeTrail(0xff9966, 600);
     scene.add(trailL.line, trailM.line, trailR.line);
 
     // ==== анимация ====
@@ -141,15 +141,17 @@
 
       // левый: XY
       {
-        const M = rotXY(t * 1.0); const verts3 = V4.map(v => project(matVec(M, v)));
+        const M = rotXY(t * 1.0);
+        const verts3 = V4.map(v => project(matVec(M, v)));
         updateWire(left, verts3);
-        const p = verts3[0].clone().add(left.position);
+        const p = verts3[0].clone().add(left.position); // выбранная вершина
         updateTrail(trailL, p);
       }
 
       // центр: изоклиническое
       {
-        const M = matMul(rotZW(t * 0.8), rotXY(t * 0.8)); const verts3 = V4.map(v => project(matVec(M, v)));
+        const M = matMul(rotZW(t * 0.8), rotXY(t * 0.8));
+        const verts3 = V4.map(v => project(matVec(M, v)));
         updateWire(mid, verts3);
         const p = verts3[0].clone().add(mid.position);
         updateTrail(trailM, p);
@@ -157,7 +159,8 @@
 
       // правый: двойное
       {
-        const M = matMul(rotZW(t * 0.6), rotXY(t * 1.2)); const verts3 = V4.map(v => project(matVec(M, v)));
+        const M = matMul(rotZW(t * 0.6), rotXY(t * 1.2));
+        const verts3 = V4.map(v => project(matVec(M, v)));
         updateWire(right, verts3);
         const p = verts3[0].clone().add(right.position);
         updateTrail(trailR, p);
