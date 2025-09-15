@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с хвостами для всех вершин</title>
+  <title>Тессеракты — хвосты всех вершин (немодульная версия)</title>
   <style>
     body {
       margin: 0;
@@ -45,40 +45,33 @@
   <div id="l2" class="label">Изоклиническое</div>
   <div id="l3" class="label">Двойное</div>
 
-  <script type="module">
-    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+  <!-- Three.js и OrbitControls -->
+  <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
 
-    /* === базовая сцена === */
+  <script>
+    /* === сцена === */
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
-
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 0, 18);
-
-    const controls = new OrbitControls(camera, renderer.domElement);
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
     /* === кватернионы === */
     function qMul(a, b) {
       const [ar, ax, ay, az] = a, [br, bx, by, bz] = b;
-      return [ar * br - ax * bx - ay * by - az * bz,
-      ar * bx + ax * br + ay * bz - az * by,
-      ar * by - ax * bz + ay * br + az * bx,
-      ar * bz + ax * by - ay * bx + az * br];
+      return [ar * br - ax * bx - ay * by - az * bz, ar * bx + ax * br + ay * bz - az * by,
+      ar * by - ax * bz + ay * br + az * bx, ar * bz + ax * by - ay * bx + az * br];
     }
     const qConj = q => [q[0], -q[1], -q[2], -q[3]];
     function qExpAxis(angle, axis) {
       const c = Math.cos(angle), s = Math.sin(angle);
-      if (axis === 'i') return [c, s, 0, 0];
-      if (axis === 'j') return [c, 0, s, 0];
-      return [c, 0, 0, s];
+      if (axis === 'i') return [c, s, 0, 0]; if (axis === 'j') return [c, 0, s, 0]; return [c, 0, 0, s];
     }
-    const vec4ToQuat = ([x, y, z, w]) => [x, y, z, w];
-    const quatToVec4 = ([r, x, y, z]) => [r, x, y, z];
+    const vec4ToQuat = v => [v[0], v[1], v[2], v[3]], quatToVec4 = q => [q[0], q[1], q[2], q[3]];
 
     /* === проекция 4D→3D === */
     const d = 3.0;
@@ -105,14 +98,12 @@
       line.geometry.attributes.position.needsUpdate = true;
     }
 
-    /* === хвост на InstancedMesh === */
-    function makeInstancedTrail(maxPoints = 200, baseRadius = 0.03) {
+    /* === хвост InstancedMesh === */
+    function makeInstancedTrail(maxPoints = 200, baseRadius = 0.025) {
       const geo = new THREE.SphereGeometry(baseRadius, 8, 8);
       const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
       const mesh = new THREE.InstancedMesh(geo, mat, maxPoints);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(maxPoints * 3), 3);
-      mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
       mesh.count = 0;
 
       const dummy = new THREE.Object3D();
@@ -125,15 +116,13 @@
         for (let i = 0; i < N; i++) {
           const age = 1 - i / (N - 1 || 1);
           dummy.position.copy(points[i]);
-          const s = 0.25 + 0.75 * age;
+          const s = 0.2 + 0.8 * age;
           dummy.scale.set(s, s, s);
           dummy.updateMatrix();
           mesh.setMatrixAt(i, dummy.matrix);
-          mesh.instanceColor.setXYZ(i, age, age, age);
         }
         mesh.count = N;
         mesh.instanceMatrix.needsUpdate = true;
-        mesh.instanceColor.needsUpdate = true;
       }
       return { mesh, pushLocal };
     }
@@ -163,7 +152,7 @@
     const M = makeBlock(0x99ff99, 0);
     const R = makeBlock(0xff9966, 6);
 
-    /* === вращение вершин === */
+    /* === вращение === */
     function rotatedProjectedVertices(qL, qR) {
       const qRinv = qConj(qR);
       return V4.map(v => {
@@ -188,7 +177,6 @@
         updateWire(L.wire, verts3);
         verts3.forEach((p, i) => { L.markers[i].position.copy(p); L.trails[i].pushLocal(p); });
       }
-
       // 2) изоклиническое
       {
         const qL = qExpAxis(0.8 * t, 'i'), qR = [1, 0, 0, 0];
@@ -196,7 +184,6 @@
         updateWire(M.wire, verts3);
         verts3.forEach((p, i) => { M.markers[i].position.copy(p); M.trails[i].pushLocal(p); });
       }
-
       // 3) двойное
       {
         const alpha = 1.2 * t, beta = 0.6 * t;
