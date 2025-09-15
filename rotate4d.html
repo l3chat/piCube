@@ -95,25 +95,36 @@
       geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       const mat = new THREE.LineBasicMaterial({ vertexColors: true, transparent: true });
-      const line = new THREE.Line(geom, mat);
+      const line = new THREE.Line(geom, mat); // важно: Line, не LineLoop
       const color = new THREE.Color(colorHex);
-      return { line, positions, colors, maxPoints, idx: 0, color };
+      return { line, positions, colors, maxPoints, color, filled: 0 };
     }
+
     function updateTrail(trail, pos) {
       const { positions, colors, maxPoints, color } = trail;
-      const i = trail.idx % maxPoints;
-      positions[i * 3 + 0] = pos.x; positions[i * 3 + 1] = pos.y; positions[i * 3 + 2] = pos.z;
-      // перезаписываем массив цветов по возрасту
-      for (let k = 0; k < maxPoints; k++) {
-        const j = (i - k + maxPoints) % maxPoints;
-        const age = 1 - k / maxPoints; // 1 → новая, 0 → старая
-        colors[j * 3 + 0] = color.r * age;
-        colors[j * 3 + 1] = color.g * age;
-        colors[j * 3 + 2] = color.b * age;
+
+      // сдвигаем массив на 1 вперёд
+      for (let i = 0; i < maxPoints - 1; i++) {
+        positions[i * 3 + 0] = positions[(i + 1) * 3 + 0];
+        positions[i * 3 + 1] = positions[(i + 1) * 3 + 1];
+        positions[i * 3 + 2] = positions[(i + 1) * 3 + 2];
       }
-      trail.idx++;
+      // новая точка в конец
+      positions[(maxPoints - 1) * 3 + 0] = pos.x;
+      positions[(maxPoints - 1) * 3 + 1] = pos.y;
+      positions[(maxPoints - 1) * 3 + 2] = pos.z;
+
+      // обновляем цвета
+      for (let i = 0; i < maxPoints; i++) {
+        const age = i / maxPoints; // 0 — старая, 1 — свежая
+        colors[i * 3 + 0] = color.r * age;
+        colors[i * 3 + 1] = color.g * age;
+        colors[i * 3 + 2] = color.b * age;
+      }
+
       trail.line.geometry.attributes.position.needsUpdate = true;
       trail.line.geometry.attributes.color.needsUpdate = true;
+      if (trail.filled < maxPoints) trail.filled++;
     }
 
     // три хвоста
@@ -127,12 +138,31 @@
     function animate() {
       requestAnimationFrame(animate);
       t += 0.01;
+
       // левый: XY
-      { const M = rotXY(t * 1.0); const verts3 = V4.map(v => project(matVec(M, v))); updateWire(left, verts3); const p = verts3[0].clone().add(left.position); updateTrail(trailL, p); }
+      {
+        const M = rotXY(t * 1.0); const verts3 = V4.map(v => project(matVec(M, v)));
+        updateWire(left, verts3);
+        const p = verts3[0].clone().add(left.position);
+        updateTrail(trailL, p);
+      }
+
       // центр: изоклиническое
-      { const M = matMul(rotZW(t * 0.8), rotXY(t * 0.8)); const verts3 = V4.map(v => project(matVec(M, v))); updateWire(mid, verts3); const p = verts3[0].clone().add(mid.position); updateTrail(trailM, p); }
+      {
+        const M = matMul(rotZW(t * 0.8), rotXY(t * 0.8)); const verts3 = V4.map(v => project(matVec(M, v)));
+        updateWire(mid, verts3);
+        const p = verts3[0].clone().add(mid.position);
+        updateTrail(trailM, p);
+      }
+
       // правый: двойное
-      { const M = matMul(rotZW(t * 0.6), rotXY(t * 1.2)); const verts3 = V4.map(v => project(matVec(M, v))); updateWire(right, verts3); const p = verts3[0].clone().add(right.position); updateTrail(trailR, p); }
+      {
+        const M = matMul(rotZW(t * 0.6), rotXY(t * 1.2)); const verts3 = V4.map(v => project(matVec(M, v)));
+        updateWire(right, verts3);
+        const p = verts3[0].clone().add(right.position);
+        updateTrail(trailR, p);
+      }
+
       renderer.render(scene, camera);
     }
     animate();
