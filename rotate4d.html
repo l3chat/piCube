@@ -19,7 +19,7 @@
 <body>
 <div id="app">
   <header>
-    <h1>4D Rotations Projected to 3D — Three.js</h1>
+    <h1>4D Rotations Projected to 3D — Three.js</h1>ff
     <div class="hint">Drag to orbit • Scroll to zoom • Double‑click to focus</div>
   </header>
   <div id="container"></div>
@@ -81,7 +81,7 @@
     ];
   }
 
-  function mat4Mul(A,B){
+  function mat4Mul(A,B){и́
     const C = new Array(16).fill(0);
     for (let r=0;r<4;r++) {
       for (let c=0;c<4;c++) {
@@ -92,7 +92,7 @@
   }
 
   function rot4XY(theta){
-    const c=Math.cos(theta), s=Math.sin(theta);
+    const c=Math.cos(theta), s=Math.sin(theta); 
     return [ c,-s, 0, 0,
              s, c, 0, 0,
              0, 0, 1, 0,
@@ -105,18 +105,19 @@
              0, 0, c,-s,
              0, 0, s, c ];
   }
-
-  function mat4VecMul(M, v){
-    const [x,y,z,w]=v; const out=[0,0,0,0];
-    out[0]=M[0]*x+M[1]*y+M[2]*z+M[3]*w;
-    out[1]=M[4]*x+M[5]*y+M[6]*z+M[7]*w;
-    out[2]=M[8]*x+M[9]*y+M[10]*z+M[11]*w;
-    out[3]=M[12]*x+M[13]*y+M[14]*z+M[15]*w;
-    return out;
+  function mat4VecMul(M, v) {
+    const [x, y, z, w] = v;
+    return [
+      M[0] * x + M[4] * y + M[8] * z + M[12] * w,
+      M[1] * x + M[5] * y + M[9] * z + M[13] * w,
+      M[2] * x + M[6] * y + M[10] * z + M[14] * w,
+      M[3] * x + M[7] * y + M[11] * z + M[15] * w
+    ];
   }
 
+
   // Perspective 4D->3D using w: scale = f/(f - w)
-  const f = 3.2; // camera-like distance in W
+  const f = 2.5; // camera-like distance in W
   function project4Dto3D(v){
     const [x,y,z,w]=v;
     const denom = (f - w);
