@@ -2,150 +2,65 @@
 <html lang="ru">
 
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Проекция вращений 4D — Three.js</title>
+  <meta charset="utf-8">
+  <title>Минимальный тессеракт — Three.js</title>
   <style>
-    html,
     body {
-      height: 100%;
       margin: 0;
-      background: #0b0f14;
-      color: #e6edf3;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-    }
-
-    #app {
-      position: fixed;
-      inset: 0;
-      display: grid;
-      grid-template-rows: auto 1fr;
-    }
-
-    header {
-      padding: 10px 16px;
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      border-bottom: 1px solid #1f2a35;
-      background: #0f141a;
-    }
-
-    header h1 {
-      font-size: 16px;
-      margin: 0;
-      font-weight: 600;
-      letter-spacing: .2px;
-      color: #e6edf3;
-    }
-
-    header .hint {
-      opacity: .75;
-      font-size: 12px;
-    }
-
-    #container {
-      position: relative;
+      overflow: hidden;
+      background: #111;
     }
 
     canvas {
       display: block;
     }
-
-    .label {
-      position: absolute;
-      padding: 6px 10px;
-      background: rgba(15, 20, 26, .8);
-      border: 1px solid #1f2a35;
-      border-radius: 10px;
-      font-size: 12px;
-      pointer-events: none;
-    }
-
-    .legend {
-      position: absolute;
-      right: 12px;
-      top: 56px;
-      font-size: 12px;
-      line-height: 1.5;
-      background: rgba(15, 20, 26, .8);
-      border: 1px solid #1f2a35;
-      border-radius: 10px;
-      padding: 8px 10px;
-      max-width: 280px;
-    }
-
-    a {
-      color: #8ab4ff;
-      text-decoration: none;
-    }
   </style>
 </head>
 
 <body>
-  <div id="app">
-    <header>
-      <h1>Проекция трёх видов вращений 4D (тессеракт) — Three.js</h1>
-      <div class="hint">ЛКМ — вращение • Колёсико — зум • Двойной щелчок — фокус на блок</div>
-    </header>
-    <div id="container"></div>
-    <div id="label1" class="label">XY‑поворот (простое)</div>
-    <div id="label2" class="label">Изоклиническое (равные углы XY и ZW)</div>
-    <div id="label3" class="label">Двойное (разные углы XY и ZW)</div>
-    <div class="legend">
-      <b>Описание</b><br>
-      Три тессеракта (4D гиперкуба) вращаются в 4D и проектируются 4D→3D перспективой по координате W. Слева — поворот
-      только в плоскости XY. По центру — изоклиническое (θ<sub>XY</sub>=θ<sub>ZW</sub>). Справа — двойное
-      (θ<sub>XY</sub>≠θ<sub>ZW</sub>).
-    </div>
-  </div><!-- Используем немодульные сборки, чтобы работало даже при открытии файла с диска -->
+  <div id="container"></div>
+
   <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
   <script src="https://unpkg.com/three@0.160.0/examples/js/controls/OrbitControls.js"></script>
   <script>
-    // ====== Сцена ======
     const container = document.getElementById('container');
-    const headerH = 44; // высота шапки
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(window.innerWidth, window.innerHeight - headerH);
-    renderer.setClearColor(0x0b0f14, 1);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / (window.innerHeight - headerH), 0.1, 200);
-    camera.position.set(0, 1.2, 12);
-
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 10);
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.dampingFactor = 0.06; controls.target.set(0, 0, 0);
 
-    // Свет и сетка
-    scene.add(new THREE.HemisphereLight(0x99bbff, 0x223344, 0.6));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.35); dir.position.set(2, 2, 2); scene.add(dir);
-    const grid = new THREE.GridHelper(30, 30, 0x2a3643, 0x1a232d); grid.position.y = -3; scene.add(grid);
-
-    // ====== 4D математика (row-major) ======
-    function mat4Identity() {
+    // ---- 4D helpers ----
+    function rotXY(th) {
+      const c = Math.cos(th), s = Math.sin(th);
       return [
-        1, 0, 0, 0,
-        0, 1, 0, 0,
+        c, -s, 0, 0,
+        s, c, 0, 0,
         0, 0, 1, 0,
         0, 0, 0, 1
       ];
     }
-
-    function mat4Mul(A, B) {
+    function rotZW(ph) {
+      const c = Math.cos(ph), s = Math.sin(ph);
+      return [
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, c, -s,
+        0, 0, s, c
+      ];
+    }
+    function matMul(A, B) {
       const C = new Array(16).fill(0);
-      for (let i = 0; i < 4; i++) {
-        for (let j = 0; j < 4; j++) {
-          let s = 0; for (let k = 0; k < 4; k++) s += A[i * 4 + k] * B[k * 4 + j];
-          C[i * 4 + j] = s;
-        }
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
+        for (let k = 0; k < 4; k++) C[i * 4 + j] += A[i * 4 + k] * B[k * 4 + j];
       }
       return C;
     }
-
-    function mat4VecMul(M, v) {
-      const x = v[0], y = v[1], z = v[2], w = v[3];
+    function matVec(M, v) {
+      const [x, y, z, w] = v;
       return [
         M[0] * x + M[1] * y + M[2] * z + M[3] * w,
         M[4] * x + M[5] * y + M[6] * z + M[7] * w,
@@ -153,154 +68,67 @@
         M[12] * x + M[13] * y + M[14] * z + M[15] * w
       ];
     }
-
-    function rot4XY(th) {
-      const c = Math.cos(th), s = Math.sin(th); return [
-        c, -s, 0, 0,
-        s, c, 0, 0,
-        0, 0, 1, 0,
-        0, 0, 0, 1
-      ];
-    }
-    function rot4ZW(ph) {
-      const c = Math.cos(ph), s = Math.sin(ph); return [
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, c, -s,
-        0, 0, s, c
-      ];
-    }
-
-    // Перспективная проекция 4D→3D по W: scale = d/(d - w)
-    const d = 3.0; // расстояние камеры по W; должно превышать |w|
-    function project4Dto3D(v) {
-      const x = v[0], y = v[1], z = v[2], w = v[3];
-      const denom = (d - w);
-      const s = Math.abs(denom) < 1e-4 ? (d / 1e-4) : (d / denom);
+    const d = 3.0;
+    function project(v) {
+      const [x, y, z, w] = v;
+      const s = d / (d - w);
       return new THREE.Vector3(x * s, y * s, z * s);
     }
 
-    // ====== Тессеракт ======
-    function tesseractVertices(size = 1) {
-      const s = size, out = [];
+    // ---- Tesseract ----
+    function vertices(s = 1) {
+      const V = [];
       for (let x of [-s, s])
         for (let y of [-s, s])
           for (let z of [-s, s])
-            for (let w of [-s, s]) out.push([x, y, z, w]);
-      return out; // 16 вершин
+            for (let w of [-s, s]) V.push([x, y, z, w]);
+      return V;
     }
-    function tesseractEdges(verts) {
-      const edges = [];
-      for (let i = 0; i < verts.length; i++) {
-        for (let j = i + 1; j < verts.length; j++) {
-          let diff = 0; for (let k = 0; k < 4; k++) if (verts[i][k] !== verts[j][k]) diff++;
-          if (diff === 1) edges.push([i, j]);
-        }
+    function edges(V) {
+      const E = [];
+      for (let i = 0; i < V.length; i++) for (let j = i + 1; j < V.length; j++) {
+        let diff = 0; for (let k = 0; k < 4; k++) if (V[i][k] !== V[j][k]) diff++;
+        if (diff === 1) E.push([i, j]);
       }
-      return edges; // 32 ребра
+      return E;
     }
 
-    const V4 = tesseractVertices(0.8);
-    const E = tesseractEdges(V4);
+    const V4 = vertices(1);
+    const E4 = edges(V4);
+    const geom = new THREE.BufferGeometry();
+    const pos = new Float32Array(E4.length * 2 * 3);
+    geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const lines = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color: 0x66ccff }));
+    scene.add(lines);
 
-    function makeWire(color) {
-      const geom = new THREE.BufferGeometry();
-      const positions = new Float32Array(E.length * 2 * 3);
-      geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95 });
-      return new THREE.LineSegments(geom, mat);
-    }
-
-    const leftLines = makeWire(0x6ab0ff);
-    const midLines = makeWire(0x9cff9c);
-    const rightLines = makeWire(0xffa86a);
-
-    const gLeft = new THREE.Group(); gLeft.add(leftLines); gLeft.position.x = -5.0; scene.add(gLeft);
-    const gMid = new THREE.Group(); gMid.add(midLines); gMid.position.x = 0.0; scene.add(gMid);
-    const gRight = new THREE.Group(); gRight.add(rightLines); gRight.position.x = 5.0; scene.add(gRight);
-
-    // DOM‑ярлыки
-    const label1 = document.getElementById('label1');
-    const label2 = document.getElementById('label2');
-    const label3 = document.getElementById('label3');
-    function placeLabel(el, obj) {
-      const wp = new THREE.Vector3(); obj.getWorldPosition(wp);
-      const p = wp.clone().project(camera);
-      const x = (p.x * 0.5 + 0.5) * renderer.domElement.clientWidth;
-      const y = (-p.y * 0.5 + 0.5) * renderer.domElement.clientHeight + headerH;
-      el.style.left = (x - el.clientWidth / 2) + 'px';
-      el.style.top = (y + 10) + 'px';
-    }
-
-    // ====== Анимация ======
-    function updateWire(line, verts3) {
-      const arr = line.geometry.attributes.position.array;
+    function updateGeom(M) {
+      const verts = V4.map(v => project(matVec(M, v)));
+      const arr = geom.attributes.position.array;
       let idx = 0;
-      for (const [i, j] of E) {
-        const a = verts3[i], b = verts3[j];
+      for (const [i, j] of E4) {
+        const a = verts[i], b = verts[j];
         arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
         arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
       }
-      line.geometry.attributes.position.needsUpdate = true;
+      geom.attributes.position.needsUpdate = true;
     }
 
+    // ---- Animate ----
     let t = 0;
     function animate() {
       requestAnimationFrame(animate);
-      t += 0.016;
-
-      const thXY1 = t * 0.8;            // слева: только XY
-      const thIso = t * 0.9;            // центр: равные углы
-      const thA = t * 0.7, thB = t * 1.2; // справа: разные углы
-
-      // LEFT: только XY
-      {
-        const M = rot4XY(thXY1);
-        const verts3 = V4.map(v => project4Dto3D(mat4VecMul(M, v)));
-        updateWire(leftLines, verts3);
-        gLeft.rotation.y = 0.2;
-      }
-
-      // MIDDLE: изоклиническое (XY и ZW одинаковые углы)
-      {
-        const M = mat4Mul(rot4ZW(thIso), rot4XY(thIso));
-        const verts3 = V4.map(v => project4Dto3D(mat4VecMul(M, v)));
-        updateWire(midLines, verts3);
-      }
-
-      // RIGHT: двойное (разные углы)
-      {
-        const M = mat4Mul(rot4ZW(thB), rot4XY(thA));
-        const verts3 = V4.map(v => project4Dto3D(mat4VecMul(M, v)));
-        updateWire(rightLines, verts3);
-        gRight.rotation.y = -0.2;
-      }
-
+      t += 0.01;
+      const M = matMul(rotZW(t * 0.7), rotXY(t * 1.0)); // двойное вращение
+      updateGeom(M);
       controls.update();
       renderer.render(scene, camera);
-
-      placeLabel(label1, gLeft);
-      placeLabel(label2, gMid);
-      placeLabel(label3, gRight);
     }
     animate();
 
-    // Resize
-    function onResize() {
-      const h = window.innerHeight - headerH;
-      renderer.setSize(window.innerWidth, h);
-      camera.aspect = window.innerWidth / h;
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-    }
-    window.addEventListener('resize', onResize);
-
-    // Double‑click: фокус на блок
-    renderer.domElement.addEventListener('dblclick', (e) => {
-      const third = renderer.domElement.clientWidth / 3;
-      const idx = Math.max(0, Math.min(2, Math.floor(e.clientX / third)));
-      const targets = [gLeft, gMid, gRight];
-      const wp = new THREE.Vector3(); targets[idx].getWorldPosition(wp);
-      controls.target.copy(wp);
     });
   </script>
 </body>
