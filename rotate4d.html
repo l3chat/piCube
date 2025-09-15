@@ -1,138 +1,235 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
-  <meta charset="utf-8">
-  <title>Три варианта вращения тессеракта с 3D-следами</title>
+  <meta charset="utf-8" />
+  <title>Три вращения тессеракта: кватернионы + 3D-хвосты</title>
   <style>
-    body { margin:0; background:#111; color:#eee; }
-    canvas { display:block; }
-    .label { position: fixed; bottom: 12px; width: 33%; text-align: center; font-size: 13px; opacity: .8; }
-    #l1 { left: 0; } #l2 { left: 33%; } #l3 { right: 0; }
+    body {
+      margin: 0;
+      background: #111;
+      color: #eee;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .label {
+      position: fixed;
+      bottom: 12px;
+      width: 33%;
+      text-align: center;
+      font-size: 13px;
+      opacity: .85;
+      pointer-events: none;
+    }
+
+    #l1 {
+      left: 0;
+    }
+
+    #l2 {
+      left: 33%;
+    }
+
+    #l3 {
+      right: 0;
+    }
   </style>
 </head>
+
 <body>
-<div id="l1" class="label">XY-поворот</div>
-<div id="l2" class="label">Изоклиническое</div>
-<div id="l3" class="label">Двойное</div>
+  <div id="l1" class="label">XY-поворот (кватернионы)</div>
+  <div id="l2" class="label">Изоклиническое</div>
+  <div id="l3" class="label">Двойное</div>
 
-<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-<script>
-// ==== базовая сцена ====
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
-camera.position.set(0, 0, 13);
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    import { Line2 } from "https://unpkg.com/three@0.160.0/examples/jsm/lines/Line2.js";
+    import { LineGeometry } from "https://unpkg.com/three@0.160.0/examples/jsm/lines/LineGeometry.js";
+    import { LineMaterial } from "https://unpkg.com/three@0.160.0/examples/jsm/lines/LineMaterial.js";
 
-// ==== 4D математика ====
-function rotXY(th){const c=Math.cos(th),s=Math.sin(th);return[
-  c,-s,0,0, s,c,0,0, 0,0,1,0, 0,0,0,1];}
-function rotZW(ph){const c=Math.cos(ph),s=Math.sin(ph);return[
-  1,0,0,0, 0,1,0,0, 0,0,c,-s, 0,0,s,c];}
-function matMul(A,B){const C=new Array(16).fill(0);
-  for(let i=0;i<4;i++)for(let j=0;j<4;j++)for(let k=0;k<4;k++)C[i*4+j]+=A[i*4+k]*B[k*4+j];
-  return C;}
-function matVec(M,v){const[x,y,z,w]=v;return[
-  M[0]*x+M[1]*y+M[2]*z+M[3]*w,
-  M[4]*x+M[5]*y+M[6]*z+M[7]*w,
-  M[8]*x+M[9]*y+M[10]*z+M[11]*w,
-  M[12]*x+M[13]*y+M[14]*z+M[15]*w];}
-const d=3.0;
-function project(v){const[x,y,z,w]=v;const s=d/(d-w);return new THREE.Vector3(x*s,y*s,z*s);}
+    /* ===== базовая сцена ===== */
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    document.body.appendChild(renderer.domElement);
 
-// ==== тессеракт ====
-function vertices(s=1){const V=[];for(let x of[-s,s])for(let y of[-s,s])for(let z of[-s,s])for(let w of[-s,s])V.push([x,y,z,w]);return V;}
-function edges(V){const E=[];for(let i=0;i<V.length;i++)for(let j=i+1;j<V.length;j++){let diff=0;for(let k=0;k<4;k++)if(V[i][k]!==V[j][k])diff++;if(diff===1)E.push([i,j]);}return E;}
-const V4=vertices(1),E4=edges(V4);
-function makeWire(color){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(E4.length*2*3),3));const m=new THREE.LineBasicMaterial({color,transparent:true,opacity:0.95});return new THREE.LineSegments(g,m);}
-const left=makeWire(0x66ccff), mid=makeWire(0x99ff99), right=makeWire(0xff9966);
-left.position.x=-4.5; right.position.x=4.5; scene.add(left,mid,right);
-for(const g of [left,mid,right]){ g.rotation.x=-0.25; g.rotation.y=0.35; }
-function updateWire(line,verts3){const arr=line.geometry.attributes.position.array;let idx=0;for(const[i,j] of E4){const a=verts3[i],b=verts3[j];arr[idx++]=a.x;arr[idx++]=a.y;arr[idx++]=a.z;arr[idx++]=b.x;arr[idx++]=b.y;arr[idx++]=b.z;}line.geometry.attributes.position.needsUpdate=true;}
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 13);
 
-// ==== хвосты ====
-function makeTrail(colorHex, maxPoints=600){
-  const geom=new THREE.BufferGeometry();
-  const positions=new Float32Array(maxPoints*3);
-  const colors=new Float32Array(maxPoints*3);
-  geom.setAttribute('position', new THREE.BufferAttribute(positions,3));
-  geom.setAttribute('color', new THREE.BufferAttribute(colors,3));
-  const mat=new THREE.LineBasicMaterial({vertexColors:true,transparent:true});
-  const line=new THREE.Line(geom,mat); // Line, не LineLoop
-  const color=new THREE.Color(colorHex);
-  return {line,positions,colors,maxPoints,color,filled:0};
-}
+    /* ===== кватернионы =====
+       Представляем точку R^4 как кватернион v = [r, x, y, z] = x + y i + z j + w k,
+       т.е. r=x, (x,y,z) = (y,z,w) в прежних обозначениях.
+       Выход обратно — массив [x, y, z, w].
+    */
+    function qMul(a, b) { // [r,x,y,z] * [r,x,y,z]
+      const [ar, ax, ay, az] = a, [br, bx, by, bz] = b;
+      return [
+        ar * br - ax * bx - ay * by - az * bz,
+        ar * bx + ax * br + ay * bz - az * by,
+        ar * by - ax * bz + ay * br + az * bx,
+        ar * bz + ax * by - ay * bx + az * br
+      ];
+    }
+    const qConj = q => [q[0], -q[1], -q[2], -q[3]];      // для единичных q: q^{-1} = \bar q
+    function qExpAxis(angle, axis) { // axis ∈ { 'i','j','k' }, чисто мнимая единичная ось
+      const c = Math.cos(angle), s = Math.sin(angle);
+      if (axis === 'i') return [c, s, 0, 0];
+      if (axis === 'j') return [c, 0, s, 0];
+      return [c, 0, 0, s]; // 'k'
+    }
 
-function updateTrail(trail,pos){
-  const {positions,colors,maxPoints,color}=trail;
+    // Преобразования между R^4 и H:
+    const vec4ToQuat = ([x, y, z, w]) => [x, y, z, w];   // r=x, i=y, j=z, k=w
+    const quatToVec4 = ([r, x, y, z]) => [r, x, y, z];
 
-  // сдвигаем все точки на одну позицию вперёд
-  for(let i=0;i<maxPoints-1;i++){
-    positions[i*3+0] = positions[(i+1)*3+0];
-    positions[i*3+1] = positions[(i+1)*3+1];
-    positions[i*3+2] = positions[(i+1)*3+2];
-  }
-  // добавляем новую точку в конец
-  positions[(maxPoints-1)*3+0] = pos.x;
-  positions[(maxPoints-1)*3+1] = pos.y;
-  positions[(maxPoints-1)*3+2] = pos.z;
+    /* ===== проекция 4D→3D =====
+       Перспектива по w (коэф. при k): s = d/(d - w)
+    */
+    const d = 3.0;
+    function project4Dto3D([x, y, z, w]) {
+      const s = d / (d - w);
+      return new THREE.Vector3(x * s, y * s, z * s);
+    }
 
-  // обновляем цвета (от старых тусклых до новых ярких)
-  for(let i=0;i<maxPoints;i++){
-    const age = i / maxPoints; // 0 — старая, 1 — свежая
-    colors[i*3+0] = color.r * age;
-    colors[i*3+1] = color.g * age;
-    colors[i*3+2] = color.b * age;
-  }
+    /* ===== тессеракт (вершины/рёбра) ===== */
+    function vertices(s = 1) {
+      const V = []; for (let x of [-s, s]) for (let y of [-s, s]) for (let z of [-s, s]) for (let w of [-s, s]) V.push([x, y, z, w]);
+      return V;
+    }
+    function edges(V) {
+      const E = []; for (let i = 0; i < V.length; i++)for (let j = i + 1; j < V.length; j++) {
+        let diff = 0; for (let k = 0; k < 4; k++) if (V[i][k] !== V[j][k]) diff++;
+        if (diff === 1) E.push([i, j]);
+      } return E;
+    }
+    const V4 = vertices(1), E4 = edges(V4);
 
-  trail.line.geometry.attributes.position.needsUpdate = true;
-  trail.line.geometry.attributes.color.needsUpdate = true;
-  if(trail.filled<maxPoints) trail.filled++;
-}
+    /* ===== проволочный каркас ===== */
+    function makeWire(color) {
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(E4.length * 2 * 3), 3));
+      const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.95 });
+      return new THREE.LineSegments(geom, mat);
+    }
+    const left = makeWire(0x66ccff);
+    const mid = makeWire(0x99ff99);
+    const right = makeWire(0xff9966);
+    left.position.x = -4.5;
+    right.position.x = 4.5;
+    scene.add(left, mid, right);
+    for (const g of [left, mid, right]) { g.rotation.x = -0.25; g.rotation.y = 0.35; }
 
-// три хвоста
-const trailL=makeTrail(0x66ccff,600);
-const trailM=makeTrail(0x99ff99,600);
-const trailR=makeTrail(0xff9966,600);
-scene.add(trailL.line, trailM.line, trailR.line);
+    function updateWire(line, verts3) {
+      const arr = line.geometry.attributes.position.array;
+      let idx = 0;
+      for (const [i, j] of E4) {
+        const a = verts3[i], b = verts3[j];
+        arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
+        arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
+      }
+      line.geometry.attributes.position.needsUpdate = true;
+    }
 
-// ==== анимация ====
-let t=0;
-function animate(){
-  requestAnimationFrame(animate);
-  t+=0.01;
+    /* ===== хвосты (толстые белые Line2) + маркеры ===== */
+    function makeTrail(maxPoints = 600) {
+      const geom = new LineGeometry();
+      const mat = new LineMaterial({ color: 0xffffff, linewidth: 0.006, transparent: true, opacity: 1.0 });
+      mat.resolution.set(window.innerWidth, window.innerHeight);
+      const line = new Line2(geom, mat);
+      line.computeLineDistances();
+      const points = new Array(maxPoints).fill(new THREE.Vector3());
+      return { line, points, maxPoints };
+    }
+    function updateTrail(trail, p) {
+      // сдвигаем и добавляем новую точку (открытая полилиния, без замыкания)
+      trail.points.shift();
+      trail.points.push(p.clone());
+      const arr = [];
+      for (const v of trail.points) arr.push(v.x, v.y, v.z);
+      trail.line.geometry.setPositions(arr);
+    }
+    const trailL = makeTrail(600), trailM = makeTrail(600), trailR = makeTrail(600);
+    scene.add(trailL.line, trailM.line, trailR.line);
 
-  // левый: XY
-  {const M=rotXY(t*1.0);
-   const verts3=V4.map(v=>project(matVec(M,v)));
-   updateWire(left,verts3);
-   const p=verts3[0].clone().add(left.position); // выбранная вершина
-   updateTrail(trailL,p);}
+    const markerGeom = new THREE.SphereGeometry(0.07, 16, 16);
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const markerL = new THREE.Mesh(markerGeom, markerMat.clone());
+    const markerM = new THREE.Mesh(markerGeom, markerMat.clone());
+    const markerR = new THREE.Mesh(markerGeom, markerMat.clone());
+    scene.add(markerL, markerM, markerR);
 
-  // центр: изоклиническое
-  {const M=matMul(rotZW(t*0.8),rotXY(t*0.8));
-   const verts3=V4.map(v=>project(matVec(M,v)));
-   updateWire(mid,verts3);
-   const p=verts3[0].clone().add(mid.position);
-   updateTrail(trailM,p);}
+    /* ===== применение кватернионных вращений =====
+       Возвращает массив 3D-позиций вершин после 4D-поворота (qL, qR) и проекции.
+    */
+    function rotatedProjectedVertices(qL, qR) {
+      const qRinv = qConj(qR); // unit quaternions
+      return V4.map(v4 => {
+        const vq = vec4ToQuat(v4);
+        const vqR = qMul(vq, qRinv);
+        const vqLR = qMul(qL, vqR);
+        const out4 = quatToVec4(vqLR);    // [x,y,z,w]
+        return project4Dto3D(out4);
+      });
+    }
 
-  // правый: двойное
-  {const M=matMul(rotZW(t*0.6),rotXY(t*1.2));
-   const verts3=V4.map(v=>project(matVec(M,v)));
-   updateWire(right,verts3);
-   const p=verts3[0].clone().add(right.position);
-   updateTrail(trailR,p);}
+    /* ===== анимация с тремя случаями ===== */
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      t += 0.01;
 
-  renderer.render(scene,camera);
-}
-animate();
+      // 1) XY-поворот: qL=exp(+θ/2 i), qR=exp(-θ/2 i) — вращает только (x,y), фиксирует (z,w)
+      {
+        const qL = qExpAxis(+0.5 * (1.0 * t), 'i');
+        const qR = qExpAxis(-0.5 * (1.0 * t), 'i');
+        const verts3 = rotatedProjectedVertices(qL, qR);
+        updateWire(left, verts3);
+        const p = verts3[0].clone().add(left.position); // выбранная вершина
+        markerL.position.copy(p);
+        updateTrail(trailL, p);
+      }
 
-window.addEventListener('resize',()=>{
-  renderer.setSize(window.innerWidth,window.innerHeight);
-  camera.aspect=window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-});
-</script>
+      // 2) Изоклиническое: qL=exp(θ i), qR=1 — одинаковые углы в (x,y) и (z,w)
+      {
+        const qL = qExpAxis(0.8 * t, 'i');
+        const qR = [1, 0, 0, 0];
+        const verts3 = rotatedProjectedVertices(qL, qR);
+        updateWire(mid, verts3);
+        const p = verts3[0].clone().add(mid.position);
+        markerM.position.copy(p);
+        updateTrail(trailM, p);
+      }
+
+      // 3) Двойное: qL=exp((α+β)/2 i), qR=exp((α-β)/2 i) — углы α в (x,y), β в (z,w)
+      {
+        const alpha = 1.2 * t, beta = 0.6 * t;
+        const qL = qExpAxis(0.5 * (alpha + beta), 'i');
+        const qR = qExpAxis(0.5 * (alpha - beta), 'i');
+        const verts3 = rotatedProjectedVertices(qL, qR);
+        updateWire(right, verts3);
+        const p = verts3[0].clone().add(right.position);
+        markerR.position.copy(p);
+        updateTrail(trailR, p);
+      }
+
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      // обновляем разрешение материалов Line2
+      trailL.line.material.resolution.set(window.innerWidth, window.innerHeight);
+      trailM.line.material.resolution.set(window.innerWidth, window.innerHeight);
+      trailR.line.material.resolution.set(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
+
 </html>
