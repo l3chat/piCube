@@ -25,6 +25,8 @@
       font-size: 14px;
       opacity: .9;
       pointer-events: none;
+      z-index: 10;
+      /* теперь надписи поверх канваса */
     }
 
     #l1 {
@@ -51,6 +53,7 @@
       display: flex;
       gap: 20px;
       align-items: center;
+      z-index: 20;
     }
 
     #controls label {
@@ -176,6 +179,9 @@
     }
     const vertexColors = rainbowColors(16);
 
+    /* === случайный порядок индексов вершин === */
+    const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
+
     /* === хвост InstancedMesh === */
     function makeInstancedTrail(baseColor) {
       const geo = new THREE.SphereGeometry(0.025, 8, 8);
@@ -200,8 +206,9 @@
           dummy.scale.set(s, s, s);
           dummy.updateMatrix();
           mesh.setMatrixAt(i, dummy.matrix);
-          const c = baseColor.clone().multiplyScalar(age);
+          const c = baseColor.clone();
           mesh.instanceColor.setXYZ(i, c.r, c.g, c.b);
+          mesh.material.opacity = age; // затухание по прозрачности
         }
         mesh.count = N;
         mesh.instanceMatrix.needsUpdate = true;
@@ -252,20 +259,22 @@
       requestAnimationFrame(animate);
       if (!paused) t += 0.01;
 
+      const pick = shuffledIndices.slice(0, activeTrails);
+
       // 1) XY
       {
         const qL = qExpAxis(+0.5 * 1.0 * t, 'i');
         const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(L.wire, verts3);
-        verts3.forEach((p, i) => { L.markers[i].visible = i < activeTrails; L.markers[i].position.copy(p); if (i < activeTrails) L.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => { const active = pick.includes(i); L.markers[i].visible = active; L.markers[i].position.copy(p); if (active) L.trails[i].pushLocal(p); });
       }
       // 2) изоклиническое
       {
         const qL = qExpAxis(0.8 * t, 'i'), qR = [1, 0, 0, 0];
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(M.wire, verts3);
-        verts3.forEach((p, i) => { M.markers[i].visible = i < activeTrails; M.markers[i].position.copy(p); if (i < activeTrails) M.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => { const active = pick.includes(i); M.markers[i].visible = active; M.markers[i].position.copy(p); if (active) M.trails[i].pushLocal(p); });
       }
       // 3) двойное
       {
@@ -274,7 +283,7 @@
         const qR = qExpAxis(0.5 * (alpha - beta), 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(R.wire, verts3);
-        verts3.forEach((p, i) => { R.markers[i].visible = i < activeTrails; R.markers[i].position.copy(p); if (i < activeTrails) R.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => { const active = pick.includes(i); R.markers[i].visible = active; R.markers[i].position.copy(p); if (active) R.trails[i].pushLocal(p); });
       }
 
       controls.update();
