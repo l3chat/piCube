@@ -202,7 +202,7 @@
         const qR = qExpAxis(0.5 * (alpha - beta), 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(right, verts3);
-        const p = verts3[0].clone().add(right.position);
+        const p = verts3[0].clone();//.add(right.position);
         markerR.position.copy(p);
         trailR.push(p);
       }
