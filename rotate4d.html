@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с простыми хвостами</title>
+  <title>Тессеракты с хвостами (InstancedMesh)</title>
   <style>
     body {
       margin: 0;
@@ -96,7 +96,7 @@
 
   <div id="controls">
     <label>Хвосты: <input id="countSlider" type="range" min="1" max="16" value="16"></label>
-    <label>Длина: <input id="lenSlider" type="range" min="10" max="200" value="50"></label>
+    <label>Длина: <input id="lenSlider" type="range" min="10" max="400" value="200"></label>
     <button id="pauseBtn">⏸ Пауза</button>
   </div>
 
@@ -106,7 +106,7 @@
 
     /* === параметры === */
     let activeTrails = 16;
-    let trailLength = 50;
+    let trailLength = 200;
     let paused = false;
 
     document.getElementById("countSlider").addEventListener("input", e => {
@@ -179,30 +179,34 @@
     /* === случайный порядок вершин === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === хвост через пул обычных Mesh === */
+    /* === хвост InstancedMesh === */
     function makeTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.05, 12, 12); // такой же размер как маркер
-      const pool = [];
-      for (let i = 0; i < 200; i++) { // максимум
-        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: baseColor }));
-        m.visible = false;
-        pool.push(m);
-      }
-      function addTo(group) { pool.forEach(m => group.add(m)); }
+      const geo = new THREE.SphereGeometry(0.05, 12, 12);
+      const mat = new THREE.MeshBasicMaterial({ color: baseColor });
+      const inst = new THREE.InstancedMesh(geo, mat, 600);
+      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      inst.count = 0;
+
+      const dummy = new THREE.Object3D();
       const points = [];
-      function pushLocal(pos) {
+
+      function pushLocal(pos, active) {
+        if (!active) { inst.count = 0; return; } // очищаем мусор
         points.unshift(pos.clone());
         if (points.length > trailLength) points.pop();
-        for (let i = 0; i < pool.length; i++) {
-          if (i < points.length) {
-            pool[i].visible = true;
-            pool[i].position.copy(points[i]);
-          } else {
-            pool[i].visible = false;
-          }
+        const N = points.length;
+        for (let i = 0; i < N; i++) {
+          const age = 1 - i / (N - 1 || 1);
+          const s = 0.12 * age + 0.05;   // уменьшаем размер
+          dummy.position.copy(points[i]);
+          dummy.scale.set(s, s, s);
+          dummy.updateMatrix();
+          inst.setMatrixAt(i, dummy.matrix);
         }
+        inst.count = N;
+        inst.instanceMatrix.needsUpdate = true;
       }
-      return { addTo, pushLocal };
+      return { mesh: inst, pushLocal };
     }
 
     /* === блок === */
@@ -218,7 +222,7 @@
       const trails = [], markers = [];
       for (let i = 0; i < 16; i++) {
         const trail = makeTrail(vertexColors[i]);
-        trail.addTo(g);
+        g.add(trail.mesh);
         trails.push(trail);
 
         const m = new THREE.Mesh(
@@ -259,14 +263,24 @@
         const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(L.wire, verts3);
-        verts3.forEach((p, i) => { const active = pick.has(i); L.markers[i].visible = active; L.markers[i].position.copy(p); if (active) L.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => {
+          const active = pick.has(i);
+          L.markers[i].visible = active;
+          L.markers[i].position.copy(p);
+          L.trails[i].pushLocal(p, active);
+        });
       }
       // 2) изоклиническое
       {
         const qL = qExpAxis(0.8 * t, 'i'), qR = [1, 0, 0, 0];
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(M.wire, verts3);
-        verts3.forEach((p, i) => { const active = pick.has(i); M.markers[i].visible = active; M.markers[i].position.copy(p); if (active) M.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => {
+          const active = pick.has(i);
+          M.markers[i].visible = active;
+          M.markers[i].position.copy(p);
+          M.trails[i].pushLocal(p, active);
+        });
       }
       // 3) двойное
       {
@@ -275,7 +289,12 @@
         const qR = qExpAxis(0.5 * (alpha - beta), 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(R.wire, verts3);
-        verts3.forEach((p, i) => { const active = pick.has(i); R.markers[i].visible = active; R.markers[i].position.copy(p); if (active) R.trails[i].pushLocal(p); });
+        verts3.forEach((p, i) => {
+          const active = pick.has(i);
+          R.markers[i].visible = active;
+          R.markers[i].position.copy(p);
+          R.trails[i].pushLocal(p, active);
+        });
       }
 
       controls.update();
