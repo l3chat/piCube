@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с затухающими хвостами</title>
+  <title>Тессеракты с затухающими хвостами (только размер)</title>
   <style>
     body {
       margin: 0;
@@ -179,14 +179,12 @@
     /* === случайный порядок вершин === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === хвост InstancedMesh c затуханием === */
+    /* === хвост InstancedMesh (только размер) === */
     function makeTrail(baseColor) {
       const geo = new THREE.SphereGeometry(0.05, 12, 12);
-      const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true });
+      const mat = new THREE.MeshBasicMaterial({ color: baseColor });
       const inst = new THREE.InstancedMesh(geo, mat, 600);
       inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
-      inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
       inst.count = 0;
 
       const dummy = new THREE.Object3D();
@@ -199,20 +197,15 @@
 
         const N = points.length;
         for (let i = 0; i < N; i++) {
-          const age = 1 - i / (N - 1 || 1);   // голова=1 → хвост=0
-          const s = 0.05 + 0.02 * age; // слегка меньше к хвосту
+          const age = 1 - i / (N - 1 || 1);   // 1 у головы → 0 у хвоста
+          const scale = 2.5 * age + 0.3; // крупнее у головы, уменьшается к хвосту
           dummy.position.copy(points[i]);
-          dummy.scale.set(s / 0.05, s / 0.05, s / 0.05);
+          dummy.scale.set(scale, scale, scale);
           dummy.updateMatrix();
           inst.setMatrixAt(i, dummy.matrix);
-
-          // затухание цвета: яркий → темнее
-          const c = baseColor.clone().lerp(new THREE.Color(0, 0, 0), 1 - age);
-          inst.setColorAt(i, c);
         }
         inst.count = N;
         inst.instanceMatrix.needsUpdate = true;
-        if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
       }
       return { mesh: inst, pushLocal };
     }
