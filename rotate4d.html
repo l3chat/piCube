@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с хвостами (надписи поверх, надёжные хвосты)</title>
+  <title>Тессеракты с яркими хвостами</title>
   <style>
     body {
       margin: 0;
@@ -13,7 +13,6 @@
       font-family: sans-serif;
     }
 
-    /* Канвас фиксируем фоном и отправляем на задний план */
     canvas {
       position: fixed;
       inset: 0;
@@ -132,7 +131,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    /* === 4D как кватернионы === */
+    /* === кватернионы === */
     function qMul(a, b) {
       const [ar, ax, ay, az] = a, [br, bx, by, bz] = b;
       return [ar * br - ax * bx - ay * by - az * bz, ar * bx + ax * br + ay * bz - az * by,
@@ -180,80 +179,38 @@
     /* === случайный порядок вершин для выбора активных хвостов === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === ХВОСТ: InstancedMesh с фолбэком на пул Mesh === */
+    /* === хвост InstancedMesh === */
     function makeTrail(baseColor) {
-      // попытаемся InstancedMesh
-      let useInst = true;
-      let inst = null, dummy = null, points = [];
-      try {
-        const geo = new THREE.SphereGeometry(0.025, 8, 8);
-        const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: false });
-        inst = new THREE.InstancedMesh(geo, mat, 600);
-        inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-        inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
-        inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
-        inst.count = 0;
-        dummy = new THREE.Object3D();
-      } catch (e) {
-        useInst = false;
-      }
+      const geo = new THREE.SphereGeometry(0.025, 8, 8);
+      const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+      const inst = new THREE.InstancedMesh(geo, mat, 600);
+      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
+      inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
+      inst.count = 0;
 
-      // если InstancedMesh не завёлся — делаем пул обычных Mesh-сфер
-      const pool = [];
-      const poolGeo = new THREE.SphereGeometry(0.025, 8, 8);
-      const poolMat = new THREE.MeshBasicMaterial({ color: baseColor });
-      if (!useInst) {
-        for (let i = 0; i < 600; i++) {
-          const m = new THREE.Mesh(poolGeo, poolMat.clone());
-          m.visible = false;
-          pool.push(m);
-        }
-      }
-
-      function addTo(group) {
-        if (useInst) group.add(inst);
-        else pool.forEach(m => group.add(m));
-      }
+      const dummy = new THREE.Object3D();
+      const points = [];
 
       function pushLocal(pos) {
         points.unshift(pos.clone());
         if (points.length > trailLength) points.pop();
-
         const N = points.length;
-        if (useInst) {
-          for (let i = 0; i < N; i++) {
-            const age = 1 - i / (N - 1 || 1);      // 1 у головы → 0 у хвоста
-            const s = 0.18 * age + 0.05;     // уменьшаем размер к хвосту
-            dummy.position.copy(points[i]);
-            dummy.scale.set(s, s, s);
-            dummy.updateMatrix();
-            inst.setMatrixAt(i, dummy.matrix);
-            // лёгкое затемнение к хвосту
-            const c = baseColor.clone().lerp(new THREE.Color(0, 0, 0), 0.6 * (1 - age));
-            inst.setColorAt(i, c);
-          }
-          inst.count = N;
-          inst.instanceMatrix.needsUpdate = true;
-          if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
-        } else {
-          // пул Mesh: показываем первые N, обновляем позицию/размер/цвет
-          for (let i = 0; i < pool.length; i++) {
-            const m = pool[i];
-            if (i < N) {
-              const age = 1 - i / (N - 1 || 1);
-              const s = 0.18 * age + 0.05;
-              m.visible = true;
-              m.position.copy(points[i]);
-              m.scale.set(s, s, s);
-              m.material.color.copy(baseColor).lerp(new THREE.Color(0, 0, 0), 0.6 * (1 - age));
-            } else {
-              m.visible = false;
-            }
-          }
+        for (let i = 0; i < N; i++) {
+          const age = 1 - i / (N - 1 || 1);   // 1 у головы → 0 у хвоста
+          const s = 0.18 * age + 0.05;   // уменьшаем размер
+          dummy.position.copy(points[i]);
+          dummy.scale.set(s, s, s);
+          dummy.updateMatrix();
+          inst.setMatrixAt(i, dummy.matrix);
+          const c = baseColor.clone(); // всегда яркий
+          inst.setColorAt(i, c);
         }
+        inst.count = N;
+        inst.instanceMatrix.needsUpdate = true;
+        if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
       }
-
-      return { addTo, pushLocal };
+      return { mesh: inst, pushLocal };
     }
 
     /* === блок (по 16 вершин с хвостами) === */
@@ -269,7 +226,7 @@
       const trails = [], markers = [];
       for (let i = 0; i < 16; i++) {
         const trail = makeTrail(vertexColors[i]);
-        trail.addTo(g);
+        g.add(trail.mesh);
         trails.push(trail);
 
         const m = new THREE.Mesh(
