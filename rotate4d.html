@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты и квадраты с тенями</title>
+  <title>Тессеракты и квадраты с ярким светом и толстыми хвостами</title>
   <style>
     body {
       margin: 0;
@@ -119,6 +119,7 @@
     let useLighting = true;
     let paused = false;
 
+    /* === элементы управления === */
     document.getElementById("countSlider").addEventListener("input", e => {
       activeTrails = parseInt(e.target.value);
     });
@@ -155,7 +156,7 @@
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;            // тени
+    renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
 
@@ -168,7 +169,7 @@
     /* === освещение === */
     let dirLight, ambLight;
     function setupLighting() {
-      dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+      dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
       dirLight.position.set(5, 10, 7);
       dirLight.castShadow = true;
       dirLight.shadow.mapSize.width = 2048;
@@ -181,7 +182,7 @@
       dirLight.shadow.camera.bottom = -30;
       scene.add(dirLight);
 
-      ambLight = new THREE.AmbientLight(0x404040, 0.6);
+      ambLight = new THREE.AmbientLight(0x404040, 0.8);
       scene.add(ambLight);
     }
     function updateLighting() {
@@ -217,7 +218,48 @@
     const d = 3.0;
     function project([x, y, z, w]) { const s = d / (d - w); return new THREE.Vector3(x * s, y * s, z * s); }
 
-    /* === тессеракт === */
+    /* === хвост InstancedMesh === */
+    function makeTrail(baseColor) {
+      const geo = new THREE.SphereGeometry(0.04, 12, 12); // толще
+      const mat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.35, metalness: 0.05 });
+      const inst = new THREE.InstancedMesh(geo, mat, 400);
+      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      inst.castShadow = true;
+      inst.receiveShadow = true;
+      inst.count = 0;
+
+      const dummy = new THREE.Object3D();
+      const points = [];
+
+      function pushLocal(pos, active) {
+        if (!active) { inst.count = 0; points.length = 0; return; }
+        points.unshift(pos.clone());
+        if (points.length > trailLength) points.pop();
+
+        const N = points.length;
+        for (let i = 0; i < N; i++) {
+          const age = 1 - i / (N - 1 || 1);
+          const scale = trailThickness * (1.5 * age + 0.2); // толще
+          dummy.position.copy(points[i]);
+          dummy.scale.set(scale, scale, scale);
+          dummy.updateMatrix();
+          inst.setMatrixAt(i, dummy.matrix);
+        }
+        inst.count = N;
+        inst.instanceMatrix.needsUpdate = true;
+      }
+      return { mesh: inst, pushLocal };
+    }
+
+    /* === радуга цветов === */
+    function rainbowColors(n) {
+      const out = []; for (let i = 0; i < n; i++) { const hue = i / n; out.push(new THREE.Color().setHSL(hue, 1, 0.55)); }
+      return out;
+    }
+    const vertexColors = rainbowColors(16);
+    const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
+
+    /* === куб === */
     function vertices(s = 1) { const V = []; for (let x of [-s, s]) for (let y of [-s, s]) for (let z of [-s, s]) for (let w of [-s, s]) V.push([x, y, z, w]); return V; }
     function edges(V) { const E = []; for (let i = 0; i < V.length; i++)for (let j = i + 1; j < V.length; j++) { let diff = 0; for (let k = 0; k < 4; k++)if (V[i][k] !== V[j][k]) diff++; if (diff === 1) E.push([i, j]); } return E; }
     const V4 = vertices(1), E4 = edges(V4);
@@ -238,50 +280,6 @@
       line.geometry.attributes.position.needsUpdate = true;
     }
 
-    /* === радуга цветов === */
-    function rainbowColors(n) {
-      const out = []; for (let i = 0; i < n; i++) { const hue = i / n; out.push(new THREE.Color().setHSL(hue, 1, 0.55)); }
-      return out;
-    }
-    const vertexColors = rainbowColors(16);
-
-    /* === случайный порядок вершин === */
-    const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
-
-    /* === хвост InstancedMesh (теневой) === */
-    function makeTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.025, 12, 12);
-      const mat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.35, metalness: 0.05 });
-      const inst = new THREE.InstancedMesh(geo, mat, 400);
-      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      inst.castShadow = true;
-      inst.receiveShadow = true;
-      inst.count = 0;
-
-      const dummy = new THREE.Object3D();
-      const points = [];
-
-      function pushLocal(pos, active) {
-        if (!active) { inst.count = 0; points.length = 0; return; }
-        points.unshift(pos.clone());
-        if (points.length > trailLength) points.pop();
-
-        const N = points.length;
-        for (let i = 0; i < N; i++) {
-          const age = 1 - i / (N - 1 || 1);
-          const scale = trailThickness * (1.2 * age + 0.15);
-          dummy.position.copy(points[i]);
-          dummy.scale.set(scale, scale, scale);
-          dummy.updateMatrix();
-          inst.setMatrixAt(i, dummy.matrix);
-        }
-        inst.count = N;
-        inst.instanceMatrix.needsUpdate = true;
-      }
-      return { mesh: inst, pushLocal };
-    }
-
-    /* === блок куба === */
     function makeBlock(color, xOffset, yOffset) {
       const g = new THREE.Group();
       g.position.x = xOffset;
@@ -299,11 +297,10 @@
         trails.push(trail);
 
         const m = new THREE.Mesh(
-          new THREE.SphereGeometry(0.025, 12, 12),
+          new THREE.SphereGeometry(0.04, 12, 12),
           new THREE.MeshStandardMaterial({ color: vertexColors[i], roughness: 0.35, metalness: 0.05 })
         );
-        m.castShadow = true;
-        m.receiveShadow = true;
+        m.castShadow = true; m.receiveShadow = true;
         g.add(m); markers.push(m);
       }
 
@@ -314,21 +311,22 @@
     const M = makeBlock(0x99ff99, 0, -4);
     const R = makeBlock(0xff9966, 6, -4);
 
-    /* === квадрат в 4D === */
-    const SqV4 = [
-      [-1, -1, 0, 0],
-      [1, -1, 0, 0],
-      [1, 1, 0, 0],
-      [-1, 1, 0, 0]
-    ];
+    /* === квадрат === */
+    const SqV4 = [[-1, -1, 0, 0], [1, -1, 0, 0], [1, 1, 0, 0], [-1, 1, 0, 0]];
     const SqE = [[0, 1], [1, 2], [2, 3], [3, 0]];
-
+    function updateSquareLine(line, verts3) {
+      const arr = line.geometry.attributes.position.array; let idx = 0;
+      for (const [i, j] of SqE) {
+        const a = verts3[i], b = verts3[j];
+        arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
+        arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
+      }
+      line.geometry.attributes.position.needsUpdate = true;
+    }
     function makeSquareBlock(color, xOffset) {
       const g = new THREE.Group();
-      g.position.x = xOffset;
-      g.position.y = 6;
-      g.rotation.x = -0.25;
-      g.rotation.y = 0.35;
+      g.position.x = xOffset; g.position.y = 6;
+      g.rotation.x = -0.25; g.rotation.y = 0.35;
 
       const geom = new THREE.BufferGeometry();
       geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(SqE.length * 2 * 3), 3));
@@ -343,11 +341,10 @@
         trails.push(trail);
 
         const m = new THREE.Mesh(
-          new THREE.SphereGeometry(0.025, 12, 12),
+          new THREE.SphereGeometry(0.04, 12, 12),
           new THREE.MeshStandardMaterial({ color, roughness: 0.35, metalness: 0.05 })
         );
-        m.castShadow = true;
-        m.receiveShadow = true;
+        m.castShadow = true; m.receiveShadow = true;
         g.add(m); markers.push(m);
       }
 
@@ -370,28 +367,17 @@
         return project(qToV4(v2));
       });
     }
-    function updateSquareLine(line, verts3) {
-      const arr = line.geometry.attributes.position.array; let idx = 0;
-      for (const [i, j] of SqE) {
-        const a = verts3[i], b = verts3[j];
-        arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
-        arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
-      }
-      line.geometry.attributes.position.needsUpdate = true;
-    }
 
     /* === анимация === */
     let t = 0;
     function animate() {
       requestAnimationFrame(animate);
       if (!paused) t += 0.01 * speed;
-
       const pick = new Set(shuffledIndices.slice(0, activeTrails));
 
       // XY
       {
-        const qL = qExpAxis(+0.5 * 1.0 * t, 'i');
-        const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
+        const qL = qExpAxis(+0.5 * 1.0 * t, 'i'); const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR, V4);
         updateWire(L.wire, verts3);
         verts3.forEach((p, i) => { const active = pick.has(i); L.markers[i].visible = active; L.markers[i].position.copy(p); L.trails[i].pushLocal(p, active); });
@@ -412,8 +398,7 @@
       // двойное
       {
         const alpha = 1.2 * t, beta = 0.6 * t;
-        const qL = qExpAxis(0.5 * (alpha + beta), 'i');
-        const qR = qExpAxis(0.5 * (alpha - beta), 'i');
+        const qL = qExpAxis(0.5 * (alpha + beta), 'i'); const qR = qExpAxis(0.5 * (alpha - beta), 'i');
         const verts3 = rotatedProjectedVertices(qL, qR, V4);
         updateWire(R.wire, verts3);
         verts3.forEach((p, i) => { const active = pick.has(i); R.markers[i].visible = active; R.markers[i].position.copy(p); R.trails[i].pushLocal(p, active); });
@@ -427,7 +412,6 @@
     }
     animate();
 
-    /* === адаптация к размеру окна === */
     window.addEventListener('resize', () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
       camera.aspect = window.innerWidth / window.innerHeight;
