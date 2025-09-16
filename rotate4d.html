@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с хвостами (InstancedMesh)</title>
+  <title>Тессеракты с хвостами (фикс размера)</title>
   <style>
     body {
       margin: 0;
@@ -179,9 +179,9 @@
     /* === случайный порядок вершин === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === хвост InstancedMesh === */
+    /* === хвост InstancedMesh (фикс размера) === */
     function makeTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.05, 12, 12);
+      const geo = new THREE.SphereGeometry(0.05, 12, 12); // одинаковый размер
       const mat = new THREE.MeshBasicMaterial({ color: baseColor });
       const inst = new THREE.InstancedMesh(geo, mat, 600);
       inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -191,15 +191,13 @@
       const points = [];
 
       function pushLocal(pos, active) {
-        if (!active) { inst.count = 0; return; } // очищаем мусор
+        if (!active) { inst.count = 0; points.length = 0; return; } // чистим при выключении
         points.unshift(pos.clone());
         if (points.length > trailLength) points.pop();
         const N = points.length;
         for (let i = 0; i < N; i++) {
-          const age = 1 - i / (N - 1 || 1);
-          const s = 0.12 * age + 0.05;   // уменьшаем размер
           dummy.position.copy(points[i]);
-          dummy.scale.set(s, s, s);
+          dummy.scale.set(1, 1, 1); // одинаковый размер
           dummy.updateMatrix();
           inst.setMatrixAt(i, dummy.matrix);
         }
