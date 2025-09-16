@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с яркими хвостами</title>
+  <title>Тессеракты с простыми хвостами</title>
   <style>
     body {
       margin: 0;
@@ -96,7 +96,7 @@
 
   <div id="controls">
     <label>Хвосты: <input id="countSlider" type="range" min="1" max="16" value="16"></label>
-    <label>Длина: <input id="lenSlider" type="range" min="50" max="600" value="200"></label>
+    <label>Длина: <input id="lenSlider" type="range" min="10" max="200" value="50"></label>
     <button id="pauseBtn">⏸ Пауза</button>
   </div>
 
@@ -104,9 +104,9 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-    /* === параметры управления === */
+    /* === параметры === */
     let activeTrails = 16;
-    let trailLength = 200;
+    let trailLength = 50;
     let paused = false;
 
     document.getElementById("countSlider").addEventListener("input", e => {
@@ -176,44 +176,36 @@
     }
     const vertexColors = rainbowColors(16);
 
-    /* === случайный порядок вершин для выбора активных хвостов === */
+    /* === случайный порядок вершин === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === хвост InstancedMesh === */
+    /* === хвост через пул обычных Mesh === */
     function makeTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.025, 8, 8);
-      const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
-      const inst = new THREE.InstancedMesh(geo, mat, 600);
-      inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
-      inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
-      inst.count = 0;
-
-      const dummy = new THREE.Object3D();
+      const geo = new THREE.SphereGeometry(0.05, 12, 12); // такой же размер как маркер
+      const pool = [];
+      for (let i = 0; i < 200; i++) { // максимум
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: baseColor }));
+        m.visible = false;
+        pool.push(m);
+      }
+      function addTo(group) { pool.forEach(m => group.add(m)); }
       const points = [];
-
       function pushLocal(pos) {
         points.unshift(pos.clone());
         if (points.length > trailLength) points.pop();
-        const N = points.length;
-        for (let i = 0; i < N; i++) {
-          const age = 1 - i / (N - 1 || 1);   // 1 у головы → 0 у хвоста
-          const s = 0.18 * age + 0.05;   // уменьшаем размер
-          dummy.position.copy(points[i]);
-          dummy.scale.set(s, s, s);
-          dummy.updateMatrix();
-          inst.setMatrixAt(i, dummy.matrix);
-          const c = baseColor.clone(); // всегда яркий
-          inst.setColorAt(i, c);
+        for (let i = 0; i < pool.length; i++) {
+          if (i < points.length) {
+            pool[i].visible = true;
+            pool[i].position.copy(points[i]);
+          } else {
+            pool[i].visible = false;
+          }
         }
-        inst.count = N;
-        inst.instanceMatrix.needsUpdate = true;
-        if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
       }
-      return { mesh: inst, pushLocal };
+      return { addTo, pushLocal };
     }
 
-    /* === блок (по 16 вершин с хвостами) === */
+    /* === блок === */
     function makeBlock(color, xOffset) {
       const g = new THREE.Group();
       g.position.x = xOffset;
@@ -226,7 +218,7 @@
       const trails = [], markers = [];
       for (let i = 0; i < 16; i++) {
         const trail = makeTrail(vertexColors[i]);
-        g.add(trail.mesh);
+        trail.addTo(g);
         trails.push(trail);
 
         const m = new THREE.Mesh(
@@ -291,7 +283,6 @@
     }
     animate();
 
-    /* === адаптация к размеру окна === */
     window.addEventListener('resize', () => {
       renderer.setSize(window.innerWidth, window.innerHeight);
       camera.aspect = window.innerWidth / window.innerHeight;
