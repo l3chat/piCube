@@ -2,10 +2,7 @@ name: Deploy multiple branches to Pages
 
 on:
   push:
-    branches:
-      - main
-      - dev
-      - test
+    branches: [ main , dev , test ]
 
 permissions:
   contents: read
