@@ -17,7 +17,7 @@
     canvas {
       position: fixed;
       inset: 0;
-      z-index: 20;
+      z-index: 0;
       display: block;
     }
 
@@ -56,7 +56,7 @@
       display: flex;
       gap: 20px;
       align-items: center;
-      z-index: 0;
+      z-index: 20;
     }
 
     #controls label {
@@ -229,4 +229,118 @@
             dummy.updateMatrix();
             inst.setMatrixAt(i, dummy.matrix);
             // лёгкое затемнение к хвосту
-            const c = baseColor
+            const c = baseColor.clone().lerp(new THREE.Color(0, 0, 0), 0.6 * (1 - age));
+            inst.setColorAt(i, c);
+          }
+          inst.count = N;
+          inst.instanceMatrix.needsUpdate = true;
+          if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+        } else {
+          // пул Mesh: показываем первые N, обновляем позицию/размер/цвет
+          for (let i = 0; i < pool.length; i++) {
+            const m = pool[i];
+            if (i < N) {
+              const age = 1 - i / (N - 1 || 1);
+              const s = 0.18 * age + 0.05;
+              m.visible = true;
+              m.position.copy(points[i]);
+              m.scale.set(s, s, s);
+              m.material.color.copy(baseColor).lerp(new THREE.Color(0, 0, 0), 0.6 * (1 - age));
+            } else {
+              m.visible = false;
+            }
+          }
+        }
+      }
+
+      return { addTo, pushLocal };
+    }
+
+    /* === блок (по 16 вершин с хвостами) === */
+    function makeBlock(color, xOffset) {
+      const g = new THREE.Group();
+      g.position.x = xOffset;
+      g.rotation.x = -0.25;
+      g.rotation.y = 0.35;
+
+      const wire = makeWire(color);
+      g.add(wire);
+
+      const trails = [], markers = [];
+      for (let i = 0; i < 16; i++) {
+        const trail = makeTrail(vertexColors[i]);
+        trail.addTo(g);
+        trails.push(trail);
+
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(0.05, 12, 12),
+          new THREE.MeshBasicMaterial({ color: vertexColors[i] })
+        );
+        g.add(m); markers.push(m);
+      }
+
+      scene.add(g);
+      return { group: g, wire, trails, markers };
+    }
+    const L = makeBlock(0x66ccff, -6);
+    const M = makeBlock(0x99ff99, 0);
+    const R = makeBlock(0xff9966, 6);
+
+    /* === вращение === */
+    function rotatedProjectedVertices(qL, qR) {
+      const qRinv = qConj(qR);
+      return V4.map(v => {
+        const vq = qMul(v4ToQ(v), qRinv);
+        const v2 = qMul(qL, vq);
+        return project(qToV4(v2));
+      });
+    }
+
+    /* === анимация === */
+    let t = 0;
+    function animate() {
+      requestAnimationFrame(animate);
+      if (!paused) t += 0.01;
+
+      const pick = new Set(shuffledIndices.slice(0, activeTrails));
+
+      // 1) XY
+      {
+        const qL = qExpAxis(+0.5 * 1.0 * t, 'i');
+        const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
+        const verts3 = rotatedProjectedVertices(qL, qR);
+        updateWire(L.wire, verts3);
+        verts3.forEach((p, i) => { const active = pick.has(i); L.markers[i].visible = active; L.markers[i].position.copy(p); if (active) L.trails[i].pushLocal(p); });
+      }
+      // 2) изоклиническое
+      {
+        const qL = qExpAxis(0.8 * t, 'i'), qR = [1, 0, 0, 0];
+        const verts3 = rotatedProjectedVertices(qL, qR);
+        updateWire(M.wire, verts3);
+        verts3.forEach((p, i) => { const active = pick.has(i); M.markers[i].visible = active; M.markers[i].position.copy(p); if (active) M.trails[i].pushLocal(p); });
+      }
+      // 3) двойное
+      {
+        const alpha = 1.2 * t, beta = 0.6 * t;
+        const qL = qExpAxis(0.5 * (alpha + beta), 'i');
+        const qR = qExpAxis(0.5 * (alpha - beta), 'i');
+        const verts3 = rotatedProjectedVertices(qL, qR);
+        updateWire(R.wire, verts3);
+        verts3.forEach((p, i) => { const active = pick.has(i); R.markers[i].visible = active; R.markers[i].position.copy(p); if (active) R.trails[i].pushLocal(p); });
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    /* === адаптация к размеру окна === */
+    window.addEventListener('resize', () => {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+    });
+  </script>
+</body>
+
+</html>
