@@ -1,0 +1,29 @@
+name: Deploy multiple branches to Pages
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - test
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source branch
+        uses: actions/checkout@v3
+
+      - name: Prepare deployment folder
+        run: |
+          mkdir -p out/${{ github.ref_name }}
+          cp -r * out/${{ github.ref_name }}/
+          rm -rf out/${{ github.ref_name }}/.git
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./out
+          keep_files: true
