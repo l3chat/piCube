@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с затухающими хвостами (только размер)</title>
+  <title>Тессеракты и квадраты</title>
   <style>
     body {
       margin: 0;
@@ -127,7 +127,7 @@
     document.body.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(0, 0, 18);
+    camera.position.set(0, 0, 22);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
@@ -179,9 +179,9 @@
     /* === случайный порядок вершин === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === хвост InstancedMesh (только размер) === */
+    /* === хвост InstancedMesh (с твоими коэффициентами) === */
     function makeTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.025, 12, 12);
+      const geo = new THREE.SphereGeometry(0.025, 12, 12); // уменьшенный радиус
       const mat = new THREE.MeshBasicMaterial({ color: baseColor });
       const inst = new THREE.InstancedMesh(geo, mat, 600);
       inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -197,8 +197,8 @@
 
         const N = points.length;
         for (let i = 0; i < N; i++) {
-          const age = 1 - i / (N - 1 || 1);   // 1 у головы → 0 у хвоста
-          const scale = 1.25 * age + 0.15; // крупнее у головы, уменьшается к хвосту
+          const age = 1 - i / (N - 1 || 1);
+          const scale = 1.2 * age + 0.15; // твои коэффициенты
           dummy.position.copy(points[i]);
           dummy.scale.set(scale, scale, scale);
           dummy.updateMatrix();
@@ -210,10 +210,11 @@
       return { mesh: inst, pushLocal };
     }
 
-    /* === блок === */
-    function makeBlock(color, xOffset) {
+    /* === блок куба === */
+    function makeBlock(color, xOffset, yOffset) {
       const g = new THREE.Group();
       g.position.x = xOffset;
+      g.position.y = yOffset;
       g.rotation.x = -0.25;
       g.rotation.y = 0.35;
 
@@ -227,7 +228,7 @@
         trails.push(trail);
 
         const m = new THREE.Mesh(
-          new THREE.SphereGeometry(0.05, 12, 12),
+          new THREE.SphereGeometry(0.025, 12, 12),
           new THREE.MeshBasicMaterial({ color: vertexColors[i] })
         );
         g.add(m); markers.push(m);
@@ -236,9 +237,26 @@
       scene.add(g);
       return { group: g, wire, trails, markers };
     }
-    const L = makeBlock(0x66ccff, -6);
-    const M = makeBlock(0x99ff99, 0);
-    const R = makeBlock(0xff9966, 6);
+    const L = makeBlock(0x66ccff, -6, -4);
+    const M = makeBlock(0x99ff99, 0, -4);
+    const R = makeBlock(0xff9966, 6, -4);
+
+    /* === блок квадрата === */
+    function makeSquare(color, xOffset) {
+      const g = new THREE.Group();
+      g.position.x = xOffset;
+      g.position.y = 6; // сверху
+      const geom = new THREE.PlaneGeometry(2, 2);
+      const mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, wireframe: true });
+      const square = new THREE.Mesh(geom, mat);
+      square.rotation.x = -0.5; // наклон
+      g.add(square);
+      scene.add(g);
+      return { group: g, square };
+    }
+    const SqL = makeSquare(0x66ccff, -6);
+    const SqM = makeSquare(0x99ff99, 0);
+    const SqR = makeSquare(0xff9966, 6);
 
     /* === вращение === */
     function rotatedProjectedVertices(qL, qR) {
@@ -258,44 +276,32 @@
 
       const pick = new Set(shuffledIndices.slice(0, activeTrails));
 
-      // 1) XY
+      // === XY ===
       {
         const qL = qExpAxis(+0.5 * 1.0 * t, 'i');
         const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(L.wire, verts3);
-        verts3.forEach((p, i) => {
-          const active = pick.has(i);
-          L.markers[i].visible = active;
-          L.markers[i].position.copy(p);
-          L.trails[i].pushLocal(p, active);
-        });
+        verts3.forEach((p, i) => { const active = pick.has(i); L.markers[i].visible = active; L.markers[i].position.copy(p); L.trails[i].pushLocal(p, active); });
+        SqL.group.rotation.y = t; // упрощённо тот же поворот
       }
-      // 2) изоклиническое
+      // === изоклиническое ===
       {
         const qL = qExpAxis(0.8 * t, 'i'), qR = [1, 0, 0, 0];
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(M.wire, verts3);
-        verts3.forEach((p, i) => {
-          const active = pick.has(i);
-          M.markers[i].visible = active;
-          M.markers[i].position.copy(p);
-          M.trails[i].pushLocal(p, active);
-        });
+        verts3.forEach((p, i) => { const active = pick.has(i); M.markers[i].visible = active; M.markers[i].position.copy(p); M.trails[i].pushLocal(p, active); });
+        SqM.group.rotation.y = 0.8 * t;
       }
-      // 3) двойное
+      // === двойное ===
       {
         const alpha = 1.2 * t, beta = 0.6 * t;
         const qL = qExpAxis(0.5 * (alpha + beta), 'i');
         const qR = qExpAxis(0.5 * (alpha - beta), 'i');
         const verts3 = rotatedProjectedVertices(qL, qR);
         updateWire(R.wire, verts3);
-        verts3.forEach((p, i) => {
-          const active = pick.has(i);
-          R.markers[i].visible = active;
-          R.markers[i].position.copy(p);
-          R.trails[i].pushLocal(p, active);
-        });
+        verts3.forEach((p, i) => { const active = pick.has(i); R.markers[i].visible = active; R.markers[i].position.copy(p); R.trails[i].pushLocal(p, active); });
+        SqR.group.rotation.y = 1.2 * t; // двойное вращение (упрощённо)
       }
 
       controls.update();
