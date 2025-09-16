@@ -181,7 +181,7 @@
 
     /* === хвост InstancedMesh (только размер) === */
     function makeTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.05, 12, 12);
+      const geo = new THREE.SphereGeometry(0.025, 12, 12);
       const mat = new THREE.MeshBasicMaterial({ color: baseColor });
       const inst = new THREE.InstancedMesh(geo, mat, 600);
       inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -198,7 +198,7 @@
         const N = points.length;
         for (let i = 0; i < N; i++) {
           const age = 1 - i / (N - 1 || 1);   // 1 у головы → 0 у хвоста
-          const scale = 2.5 * age + 0.3; // крупнее у головы, уменьшается к хвосту
+          const scale = 1.25 * age + 0.15; // крупнее у головы, уменьшается к хвосту
           dummy.position.copy(points[i]);
           dummy.scale.set(scale, scale, scale);
           dummy.updateMatrix();
