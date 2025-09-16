@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с разноцветными хвостами</title>
+  <title>Тессеракты с хвостами (надписи поверх, надёжные хвосты)</title>
   <style>
     body {
       margin: 0;
@@ -13,10 +13,12 @@
       font-family: sans-serif;
     }
 
+    /* Канвас фиксируем фоном и отправляем на задний план */
     canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
       display: block;
-      z-index: 20;
-      position: relative;
     }
 
     .label {
@@ -54,7 +56,7 @@
       display: flex;
       gap: 20px;
       align-items: center;
-      z-index: 0;
+      z-index: 20;
     }
 
     #controls label {
@@ -130,7 +132,7 @@
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
 
-    /* === кватернионы === */
+    /* === 4D как кватернионы === */
     function qMul(a, b) {
       const [ar, ax, ay, az] = a, [br, bx, by, bz] = b;
       return [ar * br - ax * bx - ay * by - az * bz, ar * bx + ax * br + ay * bz - az * by,
@@ -141,7 +143,7 @@
       const c = Math.cos(angle), s = Math.sin(angle);
       if (axis === 'i') return [c, s, 0, 0]; if (axis === 'j') return [c, 0, s, 0]; return [c, 0, 0, s];
     }
-    const vec4ToQuat = v => [v[0], v[1], v[2], v[3]], quatToVec4 = q => [q[0], q[1], q[2], q[3]];
+    const v4ToQ = v => [v[0], v[1], v[2], v[3]], qToV4 = q => [q[0], q[1], q[2], q[3]];
 
     /* === проекция 4D→3D === */
     const d = 3.0;
@@ -168,135 +170,63 @@
       line.geometry.attributes.position.needsUpdate = true;
     }
 
-    /* === радуга цветов для вершин === */
+    /* === радуга цветов === */
     function rainbowColors(n) {
-      const colors = [];
-      for (let i = 0; i < n; i++) {
-        const hue = i / n;
-        const col = new THREE.Color().setHSL(hue, 1.0, 0.5);
-        colors.push(col);
-      }
-      return colors;
+      const out = []; for (let i = 0; i < n; i++) { const hue = i / n; out.push(new THREE.Color().setHSL(hue, 1, 0.55)); }
+      return out;
     }
     const vertexColors = rainbowColors(16);
 
-    /* === случайный порядок индексов вершин === */
+    /* === случайный порядок вершин для выбора активных хвостов === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === хвост InstancedMesh === */
-    function makeInstancedTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.025, 8, 8);
-      const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 1, vertexColors: true });
-      const mesh = new THREE.InstancedMesh(geo, mat, 600);
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
-      mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
-      mesh.count = 0;
+    /* === ХВОСТ: InstancedMesh с фолбэком на пул Mesh === */
+    function makeTrail(baseColor) {
+      // попытаемся InstancedMesh
+      let useInst = true;
+      let inst = null, dummy = null, points = [];
+      try {
+        const geo = new THREE.SphereGeometry(0.025, 8, 8);
+        const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: false });
+        inst = new THREE.InstancedMesh(geo, mat, 600);
+        inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
+        inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        inst.count = 0;
+        dummy = new THREE.Object3D();
+      } catch (e) {
+        useInst = false;
+      }
 
-      const dummy = new THREE.Object3D();
-      const points = [];
+      // если InstancedMesh не завёлся — делаем пул обычных Mesh-сфер
+      const pool = [];
+      const poolGeo = new THREE.SphereGeometry(0.025, 8, 8);
+      const poolMat = new THREE.MeshBasicMaterial({ color: baseColor });
+      if (!useInst) {
+        for (let i = 0; i < 600; i++) {
+          const m = new THREE.Mesh(poolGeo, poolMat.clone());
+          m.visible = false;
+          pool.push(m);
+        }
+      }
+
+      function addTo(group) {
+        if (useInst) group.add(inst);
+        else pool.forEach(m => group.add(m));
+      }
 
       function pushLocal(pos) {
         points.unshift(pos.clone());
         if (points.length > trailLength) points.pop();
+
         const N = points.length;
-        for (let i = 0; i < N; i++) {
-          const age = 1 - i / (N - 1 || 1);
-          dummy.position.copy(points[i]);
-          const s = 0.2 * age + 0.05; // хвост уменьшается
-          dummy.scale.set(s, s, s);
-          dummy.updateMatrix();
-          mesh.setMatrixAt(i, dummy.matrix);
-          const c = baseColor.clone().lerp(new THREE.Color(0, 0, 0), 1 - age * 0.7);
-          mesh.instanceColor.setXYZ(i, c.r, c.g, c.b);
-        }
-        mesh.count = N;
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.instanceColor.needsUpdate = true;
-      }
-      return { mesh, pushLocal };
-    }
-
-    /* === блок с 16 вершинами === */
-    function makeBlock(color, xOffset) {
-      const g = new THREE.Group();
-      g.position.x = xOffset;
-      g.rotation.x = -0.25;
-      g.rotation.y = 0.35;
-      const wire = makeWire(color);
-      g.add(wire);
-
-      const trails = [], markers = [];
-      for (let i = 0; i < 16; i++) {
-        const trail = makeInstancedTrail(vertexColors[i]);
-        g.add(trail.mesh);
-        trails.push(trail);
-        const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12),
-          new THREE.MeshBasicMaterial({ color: vertexColors[i] }));
-        g.add(m); markers.push(m);
-      }
-      scene.add(g);
-      return { group: g, wire, trails, markers };
-    }
-    const L = makeBlock(0x66ccff, -6);
-    const M = makeBlock(0x99ff99, 0);
-    const R = makeBlock(0xff9966, 6);
-
-    /* === вращение === */
-    function rotatedProjectedVertices(qL, qR) {
-      const qRinv = qConj(qR);
-      return V4.map(v => {
-        const vq = vec4ToQuat(v);
-        const vqR = qMul(vq, qRinv);
-        const vqLR = qMul(qL, vqR);
-        return project(quatToVec4(vqLR));
-      });
-    }
-
-    /* === анимация === */
-    let t = 0;
-    function animate() {
-      requestAnimationFrame(animate);
-      if (!paused) t += 0.01;
-
-      const pick = shuffledIndices.slice(0, activeTrails);
-
-      // 1) XY
-      {
-        const qL = qExpAxis(+0.5 * 1.0 * t, 'i');
-        const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
-        const verts3 = rotatedProjectedVertices(qL, qR);
-        updateWire(L.wire, verts3);
-        verts3.forEach((p, i) => { const active = pick.includes(i); L.markers[i].visible = active; L.markers[i].position.copy(p); if (active) L.trails[i].pushLocal(p); });
-      }
-      // 2) изоклиническое
-      {
-        const qL = qExpAxis(0.8 * t, 'i'), qR = [1, 0, 0, 0];
-        const verts3 = rotatedProjectedVertices(qL, qR);
-        updateWire(M.wire, verts3);
-        verts3.forEach((p, i) => { const active = pick.includes(i); M.markers[i].visible = active; M.markers[i].position.copy(p); if (active) M.trails[i].pushLocal(p); });
-      }
-      // 3) двойное
-      {
-        const alpha = 1.2 * t, beta = 0.6 * t;
-        const qL = qExpAxis(0.5 * (alpha + beta), 'i');
-        const qR = qExpAxis(0.5 * (alpha - beta), 'i');
-        const verts3 = rotatedProjectedVertices(qL, qR);
-        updateWire(R.wire, verts3);
-        verts3.forEach((p, i) => { const active = pick.includes(i); R.markers[i].visible = active; R.markers[i].position.copy(p); if (active) R.trails[i].pushLocal(p); });
-      }
-
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    window.addEventListener('resize', () => {
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      camera.aspect = window.innerWidth / window.innerHeight;
-      camera.updateProjectionMatrix();
-    });
-  </script>
-</body>
-
-</html>
+        if (useInst) {
+          for (let i = 0; i < N; i++) {
+            const age = 1 - i / (N - 1 || 1);      // 1 у головы → 0 у хвоста
+            const s = 0.18 * age + 0.05;     // уменьшаем размер к хвосту
+            dummy.position.copy(points[i]);
+            dummy.scale.set(s, s, s);
+            dummy.updateMatrix();
+            inst.setMatrixAt(i, dummy.matrix);
+            // лёгкое затемнение к хвосту
+            const c = baseColor
