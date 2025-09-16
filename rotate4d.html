@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8" />
-  <title>Тессеракты с хвостами (фикс размера)</title>
+  <title>Тессеракты с затухающими хвостами</title>
   <style>
     body {
       margin: 0;
@@ -179,30 +179,40 @@
     /* === случайный порядок вершин === */
     const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
 
-    /* === хвост InstancedMesh (фикс размера) === */
+    /* === хвост InstancedMesh c затуханием === */
     function makeTrail(baseColor) {
-      const geo = new THREE.SphereGeometry(0.05, 12, 12); // одинаковый размер
-      const mat = new THREE.MeshBasicMaterial({ color: baseColor });
+      const geo = new THREE.SphereGeometry(0.05, 12, 12);
+      const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true });
       const inst = new THREE.InstancedMesh(geo, mat, 600);
       inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      inst.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(600 * 3), 3);
+      inst.instanceColor.setUsage(THREE.DynamicDrawUsage);
       inst.count = 0;
 
       const dummy = new THREE.Object3D();
       const points = [];
 
       function pushLocal(pos, active) {
-        if (!active) { inst.count = 0; points.length = 0; return; } // чистим при выключении
+        if (!active) { inst.count = 0; points.length = 0; return; }
         points.unshift(pos.clone());
         if (points.length > trailLength) points.pop();
+
         const N = points.length;
         for (let i = 0; i < N; i++) {
+          const age = 1 - i / (N - 1 || 1);   // голова=1 → хвост=0
+          const s = 0.05 + 0.02 * age; // слегка меньше к хвосту
           dummy.position.copy(points[i]);
-          dummy.scale.set(1, 1, 1); // одинаковый размер
+          dummy.scale.set(s / 0.05, s / 0.05, s / 0.05);
           dummy.updateMatrix();
           inst.setMatrixAt(i, dummy.matrix);
+
+          // затухание цвета: яркий → темнее
+          const c = baseColor.clone().lerp(new THREE.Color(0, 0, 0), 1 - age);
+          inst.setColorAt(i, c);
         }
         inst.count = N;
         inst.instanceMatrix.needsUpdate = true;
+        if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
       }
       return { mesh: inst, pushLocal };
     }
