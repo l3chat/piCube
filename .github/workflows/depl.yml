@@ -1,6 +1,8 @@
 name: multi branches
-run-name: ${{ github.actor }} is testing
-on: [push]
+run-name: ${{ github.actor }} is testing ${{ github.ref }}
+on: 
+  push: 
+    branches: [ main, dev, test ]
 jobs:
   Explore-GitHub-Actions:
     runs-on: ubuntu-latest
