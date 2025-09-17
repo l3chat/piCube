@@ -3,7 +3,7 @@ name: Claude - Deploy Multi-Branch to GitHub Pages
 # Trigger the workflow on push to specified branches
 on:
   push:
-    branches: [ main, dev, test ]
+    branches: [ "main", "dev", "test" ]
   # Allow manual triggering from Actions tab
   workflow_dispatch:
 
