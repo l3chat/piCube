@@ -34,11 +34,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-        
+      
       # Step 2: Configure GitHub Pages
       - name: Setup Pages configuration
         uses: actions/configure-pages@v4
-        
+      
       # Step 3: Determine deployment strategy based on branch
       - name: Determine deployment path and URL
         id: deploy-info
@@ -80,44 +80,44 @@ jobs:
             rm -rf deployment_temp/${{ github.ref_name }}/deployment_temp 2>/dev/null || true
             rm -rf deployment_temp/${{ github.ref_name }}/.github 2>/dev/null || true
             
-            # Create a simple index.html at root for navigation
-            cat > deployment_temp/index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-              <meta charset="UTF-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-              <title>Branch Deployments</title>
-              <style>
-                  body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-                  .branch { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
-                  a { color: #0366d6; text-decoration: none; }
-                  a:hover { text-decoration: underline; }
-              </style>
-          </head>
-          <body>
-              <h1>Available Branch Deployments</h1>
-              <div class="branch">
-                  <h3>Development Branches</h3>
-                  <p><a href="./dev/">Dev Branch</a> - Development environment</p>
-                  <p><a href="./test/">Test Branch</a> - Testing environment</p>
-              </div>
-              <p><em>Note: This page appears when non-main branches are deployed.</em></p>
-          </body>
-          </html>
-          EOF
+            # Create a simple index_dev.html at root for navigation
+            cat > deployment_temp/index_dev.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Branch Deployments</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .branch { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        a { color: #0366d6; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <h1>Available Branch Deployments</h1>
+    <div class="branch">
+        <h3>Development Branches</h3>
+        <p><a href="./dev/">Dev Branch</a> - Development environment</p>
+        <p><a href="./test/">Test Branch</a> - Testing environment</p>
+    </div>
+    <p><em>Note: This page appears when non-main branches are deployed.</em></p>
+</body>
+</html>
+EOF
           fi
           
           # List the structure for debugging
           echo "Deployment structure:"
           ls -la deployment_temp/
-          
+      
       # Step 5: Upload files to GitHub Pages
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./deployment_temp
-          
+      
       # Step 6: Deploy to GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
