@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <title>Оптимизированный тессеракт с освещением</title>
+    <title>Тессеракт с двумя цветными гипергранями</title>
     <style>
         body {
             margin: 0;
@@ -18,42 +18,6 @@
             inset: 0;
             display: block;
         }
-
-        #controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: #222;
-            color: #eee;
-            padding: 6px;
-            font-size: 13px;
-            display: flex;
-            gap: 20px;
-            align-items: center;
-            flex-wrap: wrap;
-            z-index: 20;
-        }
-
-        #controls label {
-            white-space: nowrap;
-        }
-
-        #controls input {
-            flex: 1;
-        }
-
-        #controls button {
-            padding: 4px 10px;
-            background: #444;
-            color: #eee;
-            border: 1px solid #666;
-            cursor: pointer;
-        }
-
-        #controls button:hover {
-            background: #666;
-        }
     </style>
 
     <script type="importmap">
@@ -67,59 +31,14 @@
 </head>
 
 <body>
-    <div id="controls">
-        <label>Хвосты: <input id="countSlider" type="range" min="1" max="16" value="8"></label>
-        <label>Длина: <input id="lenSlider" type="range" min="10" max="200" value="100"></label>
-        <label>Толщина: <input id="thicknessSlider" type="range" min="5" max="200" value="100"></label>
-        <label>Скорость: <input id="speedSlider" type="range" min="10" max="300" value="100"></label>
-        <button id="pauseBtn">⏸ Пауза</button>
-    </div>
-
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-        /* === параметры === */
-        let activeTrails = 8;
-        let trailLength = 100;
-        let trailThickness = 1.0;
-        let speed = 1.0;
-        let paused = false;
-        let frameCount = 0;
-
-        /* === определяем мобильное устройство === */
-        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-        if (isMobile) {
-            trailLength = Math.min(trailLength, 50);
-        }
-
-        /* === элементы управления === */
-        document.getElementById("countSlider").addEventListener("input", e => {
-            activeTrails = parseInt(e.target.value);
-        });
-        document.getElementById("lenSlider").addEventListener("input", e => {
-            trailLength = parseInt(e.target.value);
-            if (isMobile) {
-                trailLength = Math.min(trailLength, 50);
-            }
-        });
-        document.getElementById("thicknessSlider").addEventListener("input", e => {
-            trailThickness = parseInt(e.target.value) / 100;
-        });
-        document.getElementById("speedSlider").addEventListener("input", e => {
-            speed = parseInt(e.target.value) / 100;
-        });
-        document.getElementById("pauseBtn").addEventListener("click", e => {
-            paused = !paused;
-            e.target.textContent = paused ? "▶ Старт" : "⏸ Пауза";
-        });
 
         /* === сцена === */
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
         const scene = new THREE.Scene();
@@ -131,23 +50,8 @@
         /* === освещение === */
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
         dirLight.position.set(5, 10, 7);
-        dirLight.castShadow = true;
-        dirLight.shadow.mapSize.width = 1024;
-        dirLight.shadow.mapSize.height = 1024;
-        dirLight.shadow.camera.near = 0.5;
-        dirLight.shadow.camera.far = 50;
         scene.add(dirLight);
-
-        const ambLight = new THREE.AmbientLight(0x404040, 0.7);
-        scene.add(ambLight);
-
-        const planeGeom = new THREE.PlaneGeometry(100, 100);
-        const planeMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 1 });
-        const plane = new THREE.Mesh(planeGeom, planeMat);
-        plane.rotation.x = -Math.PI / 2;
-        plane.position.y = -6;
-        plane.receiveShadow = true;
-        scene.add(plane);
+        scene.add(new THREE.AmbientLight(0x404040, 0.7));
 
         /* === кватернионы === */
         function qMul(a, b) {
@@ -171,83 +75,38 @@
         function edges(V) { const E = []; for (let i = 0; i < V.length; i++)for (let j = i + 1; j < V.length; j++) { let diff = 0; for (let k = 0; k < 4; k++)if (V[i][k] !== V[j][k]) diff++; if (diff === 1) E.push([i, j]); } return E; }
         const V4 = vertices(1), E4 = edges(V4);
 
-        /* === wireframe === */
+        /* === выделим две гиперграни (w=+1 и w=-1) === */
+        const indicesWpos = V4.map((v, i) => v[3] === 1 ? i : -1).filter(i => i >= 0);
+        const indicesWneg = V4.map((v, i) => v[3] === -1 ? i : -1).filter(i => i >= 0);
+        function faceEdges(indices) {
+            const set = new Set(indices);
+            return E4.filter(([i, j]) => set.has(i) && set.has(j));
+        }
+        const Epos = faceEdges(indicesWpos);
+        const Eneg = faceEdges(indicesWneg);
+
+        /* === wireframe для всего куба === */
         function makeWire(color) {
             const g = new THREE.BufferGeometry();
             g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(E4.length * 2 * 3), 3));
-            const m = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+            const m = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5 });
             return new THREE.LineSegments(g, m);
         }
-        function updateWire(line, verts3) {
+        function updateWire(line, verts3, edges) {
             const arr = line.geometry.attributes.position.array; let idx = 0;
-            for (const [i, j] of E4) {
+            for (const [i, j] of edges) {
                 const a = verts3[i], b = verts3[j];
                 arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
                 arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
             }
+            line.geometry.setDrawRange(0, edges.length * 2);
             line.geometry.attributes.position.needsUpdate = true;
         }
 
-        /* === хвосты === */
-        function makeTrail(baseColor) {
-            const geo = new THREE.SphereGeometry(0.04, 8, 8);
-            const mat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.4, metalness: 0.1 });
-            const inst = new THREE.InstancedMesh(geo, mat, 200);
-            inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-            inst.count = 0;
-            inst.castShadow = true;
-            inst.receiveShadow = true;
-            scene.add(inst);
-
-            const dummy = new THREE.Object3D();
-            const points = [];
-            function pushLocal(pos, active) {
-                if (!active) { inst.count = 0; points.length = 0; return; }
-                // только на смартфоне добавляем точку раз в 10 кадров
-                if (!isMobile || frameCount % 10 === 0) {
-                    points.unshift(pos.clone());
-                    if (points.length > trailLength) points.pop();
-                }
-                const N = points.length;
-                for (let i = 0; i < N; i++) {
-                    const age = 1 - i / (N - 1 || 1);
-                    const scale = trailThickness * (1.5 * age + 0.2);
-                    dummy.position.copy(points[i]);
-                    dummy.scale.set(scale, scale, scale);
-                    dummy.updateMatrix();
-                    inst.setMatrixAt(i, dummy.matrix);
-                }
-                inst.count = N;
-                inst.instanceMatrix.needsUpdate = true;
-            }
-            return { mesh: inst, pushLocal };
-        }
-
-        /* === радуга для вершин === */
-        function rainbowColors(n) {
-            const out = []; for (let i = 0; i < n; i++) { const hue = i / n; out.push(new THREE.Color().setHSL(hue, 1, 0.55)); }
-            return out;
-        }
-        const vertexColors = rainbowColors(16);
-        const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
-
-        /* === объект: один гиперкуб === */
-        const group = new THREE.Group();
-        scene.add(group);
-        const wire = makeWire(0xffffff);
-        group.add(wire);
-
-        const trails = [], markers = [];
-        for (let i = 0; i < 16; i++) {
-            const trail = makeTrail(vertexColors[i]);
-            trails.push(trail);
-            const m = new THREE.Mesh(
-                new THREE.SphereGeometry(0.04, 8, 8),
-                new THREE.MeshStandardMaterial({ color: vertexColors[i], roughness: 0.4, metalness: 0.1 })
-            );
-            m.castShadow = true; m.receiveShadow = true;
-            group.add(m); markers.push(m);
-        }
+        /* === объекты === */
+        const wireAll = makeWire(0xffffff); scene.add(wireAll);
+        const wirePos = makeWire(0xff66cc); scene.add(wirePos); // розовый
+        const wireNeg = makeWire(0x66ccff); scene.add(wireNeg); // голубой
 
         /* === вращение: двойное === */
         function rotatedProjectedVertices(qL, qR, verts4) {
@@ -263,33 +122,20 @@
         let t = 0;
         function animate() {
             requestAnimationFrame(animate);
-            frameCount++;
-            if (!paused) t += 0.01 * speed;
-
-            const pick = new Set(shuffledIndices.slice(0, activeTrails));
+            t += 0.01;
             const alpha = 1.2 * t, beta = 0.6 * t;
             const qL = qExpAxis(0.5 * (alpha + beta), 'i');
             const qR = qExpAxis(0.5 * (alpha - beta), 'i');
             const verts3 = rotatedProjectedVertices(qL, qR, V4);
 
-            updateWire(wire, verts3);
-            verts3.forEach((p, i) => {
-                const active = pick.has(i);
-                markers[i].visible = active;
-                markers[i].position.copy(p);
-                trails[i].pushLocal(p, active);
-            });
+            updateWire(wireAll, verts3, E4);
+            updateWire(wirePos, verts3, Epos);
+            updateWire(wireNeg, verts3, Eneg);
 
             controls.update();
             renderer.render(scene, camera);
         }
         animate();
-
-        window.addEventListener('resize', () => {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-        });
     </script>
 </body>
 
