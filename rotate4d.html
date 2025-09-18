@@ -326,6 +326,7 @@
       line.geometry.attributes.position.needsUpdate = true;
     }
     function makeSquareBlock(color, xOffset) {
+      return;
       const g = new THREE.Group();
       g.position.x = xOffset; g.position.y = 6;
       g.rotation.x = -0.25; g.rotation.y = 0.35;
@@ -377,7 +378,7 @@
       if (!paused) t += 0.01 * speed;
       const pick = new Set(shuffledIndices.slice(0, activeTrails));
 
-      // XY
+/*       // XY
       {
         const qL = qExpAxis(+0.5 * 1.0 * t, 'i'); const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR, V4);
@@ -397,7 +398,7 @@
         updateSquareLine(SqM.wire, sqVerts3);
         sqVerts3.forEach((p, i) => { SqM.markers[i].position.copy(p); SqM.trails[i].pushLocal(p, true); });
       }
-      // двойное
+ */      // двойное
       {
         const alpha = 1.2 * t, beta = 0.6 * t;
         const qL = qExpAxis(0.5 * (alpha + beta), 'i'); const qR = qExpAxis(0.5 * (alpha - beta), 'i');
