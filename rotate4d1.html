@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Оптимизированный тессеракт</title>
+    <style>
+        body {
+            margin: 0;
+            background: #111;
+            color: #eee;
+            overflow: hidden;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            position: fixed;
+            inset: 0;
+            display: block;
+        }
+
+        #controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #222;
+            color: #eee;
+            padding: 6px;
+            font-size: 13px;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+            z-index: 20;
+        }
+
+        #controls label {
+            white-space: nowrap;
+        }
+
+        #controls input {
+            flex: 1;
+        }
+
+        #controls button {
+            padding: 4px 10px;
+            background: #444;
+            color: #eee;
+            border: 1px solid #666;
+            cursor: pointer;
+        }
+
+        #controls button:hover {
+            background: #666;
+        }
+    </style>
+
+    <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+    <div id="controls">
+        <label>Хвосты: <input id="countSlider" type="range" min="1" max="16" value="8"></label>
+        <label>Длина: <input id="lenSlider" type="range" min="10" max="200" value="100"></label>
+        <label>Толщина: <input id="thicknessSlider" type="range" min="5" max="200" value="100"></label>
+        <label>Скорость: <input id="speedSlider" type="range" min="10" max="300" value="100"></label>
+        <button id="pauseBtn">⏸ Пауза</button>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        /* === параметры === */
+        let activeTrails = 8;
+        let trailLength = 100;
+        let trailThickness = 1.0;
+        let speed = 1.0;
+        let paused = false;
+        let frameCount = 0;
+
+        /* === авто-ограничение для смартфонов === */
+        if (/Mobi|Android/i.test(navigator.userAgent)) {
+            trailLength = Math.min(trailLength, 50);
+        }
+
+        /* === элементы управления === */
+        document.getElementById("countSlider").addEventListener("input", e => {
+            activeTrails = parseInt(e.target.value);
+        });
+        document.getElementById("lenSlider").addEventListener("input", e => {
+            trailLength = parseInt(e.target.value);
+            if (/Mobi|Android/i.test(navigator.userAgent)) {
+                trailLength = Math.min(trailLength, 50);
+            }
+        });
+        document.getElementById("thicknessSlider").addEventListener("input", e => {
+            trailThickness = parseInt(e.target.value) / 100;
+        });
+        document.getElementById("speedSlider").addEventListener("input", e => {
+            speed = parseInt(e.target.value) / 100;
+        });
+        document.getElementById("pauseBtn").addEventListener("click", e => {
+            paused = !paused;
+            e.target.textContent = paused ? "▶ Старт" : "⏸ Пауза";
+        });
+
+        /* === сцена === */
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 0, 18);
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+
+        /* === кватернионы === */
+        function qMul(a, b) {
+            const [ar, ax, ay, az] = a, [br, bx, by, bz] = b;
+            return [ar * br - ax * bx - ay * by - az * bz, ar * bx + ax * br + ay * bz - az * by,
+            ar * by - ax * bz + ay * br + az * bx, ar * bz + ax * by - ay * bx + az * br];
+        }
+        const qConj = q => [q[0], -q[1], -q[2], -q[3]];
+        function qExpAxis(angle, axis) {
+            const c = Math.cos(angle), s = Math.sin(angle);
+            if (axis === 'i') return [c, s, 0, 0]; if (axis === 'j') return [c, 0, s, 0]; return [c, 0, 0, s];
+        }
+        const v4ToQ = v => [v[0], v[1], v[2], v[3]], qToV4 = q => [q[0], q[1], q[2], q[3]];
+
+        /* === проекция 4D→3D === */
+        const d = 3.0;
+        function project([x, y, z, w]) { const s = d / (d - w); return new THREE.Vector3(x * s, y * s, z * s); }
+
+        /* === геометрия гиперкуба === */
+        function vertices(s = 1) { const V = []; for (let x of [-s, s]) for (let y of [-s, s]) for (let z of [-s, s]) for (let w of [-s, s]) V.push([x, y, z, w]); return V; }
+        function edges(V) { const E = []; for (let i = 0; i < V.length; i++)for (let j = i + 1; j < V.length; j++) { let diff = 0; for (let k = 0; k < 4; k++)if (V[i][k] !== V[j][k]) diff++; if (diff === 1) E.push([i, j]); } return E; }
+        const V4 = vertices(1), E4 = edges(V4);
+
+        /* === wireframe === */
+        function makeWire(color) {
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(E4.length * 2 * 3), 3));
+            const m = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
+            return new THREE.LineSegments(g, m);
+        }
+        function updateWire(line, verts3) {
+            const arr = line.geometry.attributes.position.array; let idx = 0;
+            for (const [i, j] of E4) {
+                const a = verts3[i], b = verts3[j];
+                arr[idx++] = a.x; arr[idx++] = a.y; arr[idx++] = a.z;
+                arr[idx++] = b.x; arr[idx++] = b.y; arr[idx++] = b.z;
+            }
+            line.geometry.attributes.position.needsUpdate = true;
+        }
+
+        /* === хвосты === */
+        function makeTrail(baseColor) {
+            const geo = new THREE.SphereGeometry(0.04, 8, 8);
+            const mat = new THREE.MeshBasicMaterial({ color: baseColor });
+            const inst = new THREE.InstancedMesh(geo, mat, 200);
+            inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            inst.count = 0;
+            scene.add(inst);
+
+            const dummy = new THREE.Object3D();
+            const points = [];
+            function pushLocal(pos, active) {
+                if (!active) { inst.count = 0; points.length = 0; return; }
+                // Добавляем новую точку только раз в 10 кадров
+                if (frameCount % 10 === 0) {
+                    points.unshift(pos.clone());
+                    if (points.length > trailLength) points.pop();
+                }
+                const N = points.length;
+                for (let i = 0; i < N; i++) {
+                    const age = 1 - i / (N - 1 || 1);
+                    const scale = trailThickness * (1.5 * age + 0.2);
+                    dummy.position.copy(points[i]);
+                    dummy.scale.set(scale, scale, scale);
+                    dummy.updateMatrix();
+                    inst.setMatrixAt(i, dummy.matrix);
+                }
+                inst.count = N;
+                inst.instanceMatrix.needsUpdate = true;
+            }
+            return { mesh: inst, pushLocal };
+        }
+
+        /* === радуга для вершин === */
+        function rainbowColors(n) {
+            const out = []; for (let i = 0; i < n; i++) { const hue = i / n; out.push(new THREE.Color().setHSL(hue, 1, 0.55)); }
+            return out;
+        }
+        const vertexColors = rainbowColors(16);
+        const shuffledIndices = [...Array(16).keys()].sort(() => Math.random() - 0.5);
+
+        /* === объект: один гиперкуб === */
+        const group = new THREE.Group();
+        scene.add(group);
+        const wire = makeWire(0xffffff);
+        group.add(wire);
+
+        const trails = [], markers = [];
+        for (let i = 0; i < 16; i++) {
+            const trail = makeTrail(vertexColors[i]);
+            trails.push(trail);
+            const m = new THREE.Mesh(
+                new THREE.SphereGeometry(0.04, 8, 8),
+                new THREE.MeshBasicMaterial({ color: vertexColors[i] })
+            );
+            group.add(m); markers.push(m);
+        }
+
+        /* === вращение: двойное === */
+        function rotatedProjectedVertices(qL, qR, verts4) {
+            const qRinv = qConj(qR);
+            return verts4.map(v => {
+                const vq = qMul(v4ToQ(v), qRinv);
+                const v2 = qMul(qL, vq);
+                return project(qToV4(v2));
+            });
+        }
+
+        /* === анимация === */
+        let t = 0;
+        function animate() {
+            requestAnimationFrame(animate);
+            frameCount++;
+            if (!paused) t += 0.01 * speed;
+
+            const pick = new Set(shuffledIndices.slice(0, activeTrails));
+            const alpha = 1.2 * t, beta = 0.6 * t;
+            const qL = qExpAxis(0.5 * (alpha + beta), 'i');
+            const qR = qExpAxis(0.5 * (alpha - beta), 'i');
+            const verts3 = rotatedProjectedVertices(qL, qR, V4);
+
+            updateWire(wire, verts3);
+            verts3.forEach((p, i) => {
+                const active = pick.has(i);
+                markers[i].visible = active;
+                markers[i].position.copy(p);
+                trails[i].pushLocal(p, active);
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+    </script>
+</body>
+
+</html>
