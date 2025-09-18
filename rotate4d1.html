@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="utf-8" />
-    <title>Оптимизированный тессеракт</title>
+    <title>Оптимизированный тессеракт с освещением</title>
     <style>
         body {
             margin: 0;
@@ -87,8 +87,9 @@
         let paused = false;
         let frameCount = 0;
 
-        /* === авто-ограничение для смартфонов === */
-        if (/Mobi|Android/i.test(navigator.userAgent)) {
+        /* === определяем мобильное устройство === */
+        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+        if (isMobile) {
             trailLength = Math.min(trailLength, 50);
         }
 
@@ -98,7 +99,7 @@
         });
         document.getElementById("lenSlider").addEventListener("input", e => {
             trailLength = parseInt(e.target.value);
-            if (/Mobi|Android/i.test(navigator.userAgent)) {
+            if (isMobile) {
                 trailLength = Math.min(trailLength, 50);
             }
         });
@@ -117,6 +118,8 @@
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.body.appendChild(renderer.domElement);
 
         const scene = new THREE.Scene();
@@ -124,6 +127,27 @@
         camera.position.set(0, 0, 18);
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
+
+        /* === освещение === */
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(5, 10, 7);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 50;
+        scene.add(dirLight);
+
+        const ambLight = new THREE.AmbientLight(0x404040, 0.7);
+        scene.add(ambLight);
+
+        const planeGeom = new THREE.PlaneGeometry(100, 100);
+        const planeMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 1 });
+        const plane = new THREE.Mesh(planeGeom, planeMat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = -6;
+        plane.receiveShadow = true;
+        scene.add(plane);
 
         /* === кватернионы === */
         function qMul(a, b) {
@@ -167,18 +191,20 @@
         /* === хвосты === */
         function makeTrail(baseColor) {
             const geo = new THREE.SphereGeometry(0.04, 8, 8);
-            const mat = new THREE.MeshBasicMaterial({ color: baseColor });
+            const mat = new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.4, metalness: 0.1 });
             const inst = new THREE.InstancedMesh(geo, mat, 200);
             inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
             inst.count = 0;
+            inst.castShadow = true;
+            inst.receiveShadow = true;
             scene.add(inst);
 
             const dummy = new THREE.Object3D();
             const points = [];
             function pushLocal(pos, active) {
                 if (!active) { inst.count = 0; points.length = 0; return; }
-                // Добавляем новую точку только раз в 10 кадров
-                if (frameCount % 10 === 0) {
+                // только на смартфоне добавляем точку раз в 10 кадров
+                if (!isMobile || frameCount % 10 === 0) {
                     points.unshift(pos.clone());
                     if (points.length > trailLength) points.pop();
                 }
@@ -217,8 +243,9 @@
             trails.push(trail);
             const m = new THREE.Mesh(
                 new THREE.SphereGeometry(0.04, 8, 8),
-                new THREE.MeshBasicMaterial({ color: vertexColors[i] })
+                new THREE.MeshStandardMaterial({ color: vertexColors[i], roughness: 0.4, metalness: 0.1 })
             );
+            m.castShadow = true; m.receiveShadow = true;
             group.add(m); markers.push(m);
         }
 
