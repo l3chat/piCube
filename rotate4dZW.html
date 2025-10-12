@@ -379,7 +379,7 @@
 
       // XW
       {
-        const qL = qExpAxis(+0.5 * 1.0 * t, 'k'); const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
+        const qL = qExpAxis(+0.5 * 1.0 * t, 'k'); const qR = qExpAxis(+0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR, V4);
         updateWire(L.wire, verts3);
         verts3.forEach((p, i) => { const active = pick.has(i); L.markers[i].visible = active; L.markers[i].position.copy(p); L.trails[i].pushLocal(p, active); });
