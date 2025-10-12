@@ -377,9 +377,9 @@
       if (!paused) t += 0.01 * speed;
       const pick = new Set(shuffledIndices.slice(0, activeTrails));
 
-      // ZW
+      // XW
       {
-        const qL = qExpAxis(+0.5 * 1.0 * t, 'k'); const qR = qExpAxis(-0.5 * 1.0 * t, 'k');
+        const qL = qExpAxis(+0.5 * 1.0 * t, 'k'); const qR = qExpAxis(-0.5 * 1.0 * t, 'i');
         const verts3 = rotatedProjectedVertices(qL, qR, V4);
         updateWire(L.wire, verts3);
         verts3.forEach((p, i) => { const active = pick.has(i); L.markers[i].visible = active; L.markers[i].position.copy(p); L.trails[i].pushLocal(p, active); });
