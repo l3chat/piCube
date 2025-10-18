@@ -119,15 +119,15 @@
     const tg = window.Telegram.WebApp||null;
 
 if(tg){
-window.alert('####1222#');
     // Expand the app to full height
     tg.expand();
 
-window.alert('####1223#');
+window.alert(tg);
 
     // Access user data
     const user = tg.initDataUnsafe.user;
     console.log(user.first_name, user.username);
+window.alert('####1222#');
 
     // Style to match Telegram theme
     document.body.style.backgroundColor = tg.backgroundColor;
