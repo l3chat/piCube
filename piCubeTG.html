@@ -87,7 +87,7 @@
 <!-- Load Telegram script first (traditional way) -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-  <script type="importmap">
+     <script type="importmap">
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
@@ -109,7 +109,7 @@
     <button onclick="highlightPlane(null, null, this)">---</button>
     <button onclick="toggleAutoRotate(this)">⟳</button>
   </div>
-
+/
   <script type="module">
     import * as THREE from 'three'; //"https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js";
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; //"https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js";
@@ -119,6 +119,7 @@
     const tg = window.Telegram.WebApp;
 
 if(tg){
+window.alert('####1222#');
     // Expand the app to full height
     tg.expand();
 
@@ -136,7 +137,6 @@ if(tg){
         // Handle button click
         tg.sendData(JSON.stringify({your: 'data'}));
     });
-window.alert('####1222#');
 
     // Show back button
     tg.BackButton.show();
