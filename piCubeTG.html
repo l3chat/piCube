@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>π³</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@1/css/pico.min.css">
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #111;
+    }
+
+    /* Общие стили кнопок */
+    .buttons {
+      position: absolute;
+      z-index: 1;
+      display: flex;
+      gap: 6px;
+    }
+
+    .buttons button {
+      background: #0288d1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 12px;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      /* выравнивание по вертикали */
+      justify-content: center;
+      /* выравнивание по горизонтали */
+    }
+
+    .buttons button:hover {
+      background: #03a9f4;
+    }
+
+    /* Портретная ориентация */
+    @media (orientation: portrait) {
+      .buttons {
+        flex-direction: row;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 95%;
+        /* почти на всю ширину */
+      }
+
+      .buttons button {
+        flex: 1;
+        /* равномерное деление ширины */
+        min-height: 120px;
+        /* крупнее по высоте */
+        font-size: clamp(18px, 5vw, 36px);
+      }
+    }
+
+    /* Альбомная ориентация */
+    @media (orientation: landscape) {
+      .buttons {
+        flex-direction: column;
+        top: 0;
+        left: 10px;
+        transform: none;
+        height: 100%;
+        /* контейнер занимает всю высоту */
+      }
+
+      .buttons button {
+        flex: 1;
+        /* кнопки равномерно делят высоту */
+        min-height: 40px;
+        min-width: 60px;
+        /* но не меньше */
+        margin: 2px 0;
+        /* маленький отступ между кнопками */
+      }
+    }
+  </style>
+<!-- Load Telegram script first (traditional way) -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+  }
+}
+  </script>
+</head>
+
+<body>
+  <div class="buttons">
+    <button onclick="toggleFullscreen()">⛶</button>
+    <button onclick="highlightPlane('z', 0, this)">-1-</button>
+    <button onclick="highlightPlane('z', 1, this)">-2-</button>
+    <button onclick="highlightPlane('z', 2, this)">-3-</button>
+    <button onclick="highlightPlane('z', 3, this)">-4-</button>
+    <button onclick="highlightPlane('z', 4, this)">-5-</button>
+    <button onclick="highlightPlane(null, null, this)">---</button>
+    <button onclick="toggleAutoRotate(this)">⟳</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three'; //"https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js";
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js'; //"https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js";
+
+    // Access Telegram API (it's global)
+    const tg = window.Telegram.WebApp;
+
+if(tg){
+    // Expand the app to full height
+    tg.expand();
+
+    // Access user data
+    const user = tg.initDataUnsafe.user;
+    console.log(user.first_name, user.username);
+
+    // Style to match Telegram theme
+    document.body.style.backgroundColor = tg.backgroundColor;
+
+    // Show/hide main button
+    tg.MainButton.setText('Submit');
+    tg.MainButton.show();
+    tg.MainButton.onClick(() => {
+        // Handle button click
+        tg.sendData(JSON.stringify({your: 'data'}));
+    });
+
+    // Show back button
+    tg.BackButton.show();
+    tg.BackButton.onClick(() => {
+        // Handle back navigation
+    });
+
+    // Haptic feedback
+    tg.HapticFeedback.impactOccurred('medium');
+}
+
+    const labels = [];
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x111111, 2, 12);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1));
+
+    // OrbitControls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 2;
+    controls.maxDistance = 10;
+
+    // параметры куба
+    const gridSize = 5;
+    const spacing = 0.5;
+
+    // цифры π
+    const piDigits =
+      "14159265358979323846264338327950288419716939937510" +
+      "58209749445923078164062862089986280348253421170679" +
+      "82148086513282306647093844609550582231725359408128" +
+      "48111745028410270193852110555964462294895493038196" +
+      "44288109756659334461284756482337867831652712019091";
+    const piPairs = piDigits.match(/../g);
+
+    function createNumberPlane(text, color = 'cyan', size = 0.2) {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const dim = 128;
+      canvas.width = canvas.height = dim;
+
+      ctx.clearRect(0, 0, dim, dim);
+      ctx.fillStyle = color;
+      ctx.font = 'bold 80px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, dim / 2, dim / 2);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, side: THREE.DoubleSide });
+      const geometry = new THREE.PlaneGeometry(size, size);
+      return new THREE.Mesh(geometry, material);
+    }
+
+    let piIndex = 0;
+    for (let z = 0; z < gridSize; z++) {
+      for (let y = 0; y < gridSize; y++) {
+        for (let x = 0; x < gridSize; x++) {
+          const px = -(x - 2) * spacing;
+          const py = -(y - 2) * spacing;
+          const pz = (z - 2) * spacing;
+
+          const label = createNumberPlane(piPairs[piIndex++] || "??");
+          label.position.set(px, py, pz);
+          label.lookAt(px, py, pz - 1);
+
+          scene.add(label);
+          labels.push({
+            mesh: label,
+            pos: { x, y, z },
+            targetScale: 1,
+            defaultColor: 'cyan',
+            text: piPairs[piIndex - 1]
+          });
+        }
+      }
+    }
+
+    // позиция камеры
+    camera.position.set(-1.5, 2, -4.5);
+    camera.lookAt(0, 0, 0);
+
+
+
+
+
+    function updateFog() {
+      // === Dynamic fog ===
+      const dist = camera.position.length();   // distance from origin
+      scene.fog.near = dist - 2;             // fog starts closer
+      scene.fog.far = dist + 5;             // fog ends further
+    }
+    updateFog();
+
+
+    // ==== Автовращение вокруг произвольной оси ====
+    let autoRotate = true;                          // начально — выкл
+    let rotateAxis = new THREE.Vector3(0, 1, 0);     // ось по умолчанию
+    let radius = camera.position.length();           // текущая дистанция
+    let resumeAutoAfterDrag = true;                  // запоминание состояния при ручном управлении
+
+    // Пересчитать ось вращения:
+    // направление на камеру → поворачиваем немного относительно перпендикуляра
+    function recalcRotateAxis(tilt = 0.06) {
+      const dir = camera.position.clone().normalize(); // направление на камеру
+      let up = new THREE.Vector3(0, 1, 0);
+      if (Math.abs(dir.dot(up)) > 0.99) up.set(1, 0, 0); // избежим параллельности
+
+      const perp = new THREE.Vector3().crossVectors(dir, up).normalize();
+      const q = new THREE.Quaternion().setFromAxisAngle(perp, tilt);
+      rotateAxis.copy(dir).applyQuaternion(q).normalize();
+
+      if (!isFinite(rotateAxis.x) || !isFinite(rotateAxis.y) || !isFinite(rotateAxis.z)) {
+        rotateAxis.set(0, 1, 0);
+      }
+    }
+    recalcRotateAxis();
+
+    // Кнопка-переключатель
+    window.toggleAutoRotate = function (button) {
+      autoRotate = !autoRotate;
+      button?.classList.toggle('active', autoRotate);
+      if (autoRotate) {
+        recalcRotateAxis();
+        radius = camera.position.length();
+      }
+    };
+
+
+    let isZooming = false;
+    // При начале ручного вращения — пауза
+    controls.addEventListener('start', () => {
+      if (!isZooming) resumeAutoAfterDrag = autoRotate;
+      isZooming = true;
+      autoRotate = false;
+    });
+
+    // При завершении — вернуть автовращение, если было активно
+    controls.addEventListener('end', () => {
+      radius = camera.position.length();
+      recalcRotateAxis();
+      if (resumeAutoAfterDrag) autoRotate = true;
+      isZooming = false;
+    });
+    controls.enableZoom = true; // allow zoom (already default)
+
+
+
+    // === Анимация ===
+    function animate() {
+      requestAnimationFrame(animate);
+
+      if (autoRotate) {
+        const step = 0.02; // скорость автовращения (рад/кадр)
+        const q = new THREE.Quaternion().setFromAxisAngle(rotateAxis, step);
+        camera.position.applyQuaternion(q);
+        camera.position.setLength(radius); // сохраняем дистанцию
+        camera.lookAt(0, 0, 0);
+      } else {
+        controls.update(); // плавность OrbitControls
+      }
+
+      updateFog();
+      updateScalesAndColors();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+
+
+
+
+
+
+
+
+
+    // анимация масштаба и яркости
+    function updateScalesAndColors() {
+      labels.forEach(label => {
+        // Масштаб
+        const current = label.mesh.scale.x;
+        const target = label.targetScale;
+        const newScale = THREE.MathUtils.lerp(current, target, 0.15);
+        label.mesh.scale.set(newScale, newScale, 1);
+
+        // Цвет (обновляем текстуру без пересоздания объекта)
+        const isBright = target > 1.5;
+        const desiredColor = isBright ? 'white' : label.targetScale < 1 ? '#044' : label.defaultColor;
+
+        if (label.currentColor !== desiredColor) {
+          // перерисовываем канвас
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const dim = 128;
+          canvas.width = canvas.height = dim;
+
+          ctx.clearRect(0, 0, dim, dim);
+          ctx.fillStyle = desiredColor;
+          ctx.font = 'bold 80px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(label.text, dim / 2, dim / 2);
+
+          const texture = new THREE.CanvasTexture(canvas);
+          label.mesh.material.map.dispose(); // освободим старую текстуру
+          label.mesh.material.map = texture;
+          label.mesh.material.needsUpdate = true;
+
+          label.currentColor = desiredColor;
+        }
+      });
+    }
+
+
+    // === Подгонка окна ===
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // === Подсветка плоскости ===
+    window.highlightPlane = function (axis, value, button) {
+      document.querySelectorAll('.buttons button').forEach(btn => btn.classList.remove('active'));
+      if (button) button.classList.add('active');
+
+      labels.forEach(label => {
+        if (axis === null) {
+          label.targetScale = 1;
+        } else {
+          const match = label.pos[axis] === value;
+          label.targetScale = match ? 2.5 : 0.9;
+        }
+      });
+    }
+
+    // === Горячие клавиши для выделения плоскостей ===
+    // 1–5: z=0..4
+    // 0: сброс выделения
+    window.addEventListener("keydown", (event) => {
+      const key = event.key;
+
+      if (key >= "1" && key <= "5") {
+        const planeIndex = parseInt(key, 10) - 1;
+        highlightPlane("z", planeIndex, document.querySelectorAll(".buttons button")[planeIndex]);
+      } else if (key === "0") {
+        highlightPlane(null, null, document.querySelectorAll(".buttons button")[5]); // кнопка "---"
+      }
+    });
+
+    // === Полноэкранный режим ===
+    window.toggleFullscreen = function () {
+      if (!document.fullscreenElement) {
+        // если не в полноэкранном
+        document.documentElement.requestFullscreen().catch(err => {
+          console.warn(`Ошибка при включении полноэкранного режима: ${err.message}`);
+        });
+      } else {
+        // выйти из полноэкранного
+        document.exitFullscreen();
+      }
+    };
+
+  </script>
+</body>
+
+</html>
