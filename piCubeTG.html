@@ -121,7 +121,6 @@
 if(tg){
     // Expand the app to full height
     tg.expand();
-window.alert('####1221#');
 
     // Access user data
     const user = tg.initDataUnsafe.user;
@@ -137,6 +136,7 @@ window.alert('####1221#');
         // Handle button click
         tg.sendData(JSON.stringify({your: 'data'}));
     });
+window.alert('####1222#');
 
     // Show back button
     tg.BackButton.show();
